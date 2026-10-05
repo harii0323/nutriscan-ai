@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src scripts",
     "test": "vitest run",
     "test:fast": "vitest run src/__tests__/unit.test.js src/__tests__/integration.test.js src/__tests__/functional.test.jsx src/__tests__/security-build.test.js",
     "test:e2e": "vitest run src/__tests__/e2e-api.test.js",

@@ -20,7 +20,8 @@ describe('Security & Environment Tests', () => {
     expect(fs.existsSync(examplePath)).toBe(true);
 
     const content = fs.readFileSync(examplePath, 'utf8');
-    expect(content).not.toContain('AIzaSyA3BjQhkkD57dfrQgbg-jvmlAicmO75T8I');
+    // Ensure no real Google API keys (starting with AIza) are committed to the public example template
+    expect(content).not.toMatch(/AIza[0-9A-Za-z-_]{35}/);
     expect(content).toContain('VITE_FIREBASE_API_KEY');
     expect(content).toContain('VITE_GEMINI_API_KEY');
   });

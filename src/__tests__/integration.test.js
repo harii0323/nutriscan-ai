@@ -6,7 +6,8 @@ describe('Integration Tests: Firebase Configuration & Modules', () => {
   it('initializes Firebase app instance with config values', () => {
     expect(app).toBeDefined();
     expect(app.name).toBe('[DEFAULT]');
-    expect(app.options.projectId).toBe('studio-3997613211-3d795');
+    const expectedProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'demo-project';
+    expect(app.options.projectId).toBe(expectedProjectId);
   });
 
   it('creates Firebase Auth service instance', () => {
