@@ -155,56 +155,66 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
           exit={{ opacity: 0 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(44,62,80,0.55)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '1rem',
+            padding: '1.25rem',
           }}
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 24 }}
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 24 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            exit={{ opacity: 0, scale: 0.94, y: 16 }}
+            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
             onClick={e => e.stopPropagation()}
             style={{
-              background: 'white',
-              borderRadius: '1.5rem',
-              padding: '2rem',
+              background: '#FFFFFF',
+              borderRadius: '1.25rem',
+              padding: '2.25rem',
               width: '100%',
               maxWidth: 440,
-              boxShadow: '0 24px 80px rgba(44,62,80,0.25)',
+              boxShadow: '0 24px 64px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08)',
               position: 'relative',
             }}
           >
-            {/* Close */}
+            {/* Close Button */}
             <button
               onClick={handleClose}
               aria-label="Close dialog"
               style={{
-                position: 'absolute', top: '1rem', right: '1rem',
-                background: '#f0ece8', border: 'none', borderRadius: '50%',
+                position: 'absolute', top: '1.25rem', right: '1.25rem',
+                background: '#F1F5F9', border: 'none', borderRadius: '50%',
                 width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#576574',
+                cursor: 'pointer', color: '#64748B', transition: 'background-color 0.15s, color 0.15s',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#E2E8F0'; e.currentTarget.style.color = '#0F172A'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B'; }}
             >
               <X size={16} />
             </button>
 
-            {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-              <Leaf size={22} color="#4C5F4E" />
-              <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#4C5F4E' }}>NutriScan AI</span>
+            {/* Brand Capsule */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', marginBottom: '1.25rem' }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '0.5rem',
+                background: 'linear-gradient(135deg, #0E3B2E 0%, #166534 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Leaf size={15} color="white" />
+              </div>
+              <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.05rem', color: '#0E3B2E' }}>
+                NutriScan AI
+              </span>
             </div>
 
-            <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.5rem', color: '#2C3E50' }}>
+            <h2 style={{ margin: '0 0 0.35rem', fontSize: '1.5rem', color: '#0F172A', letterSpacing: '-0.02em' }}>
               {mode === 'login' ? 'Welcome back' :
                mode === 'signup' ? 'Create account' :
                mode === 'forgot' ? 'Reset password' : 'Phone sign-in'}
             </h2>
-            <p style={{ margin: '0 0 1.5rem', color: '#576574', fontSize: '0.88rem' }}>
+            <p style={{ margin: '0 0 1.5rem', color: '#4B5563', fontSize: '0.88rem', lineHeight: 1.55 }}>
               {mode === 'login' ? 'Sign in to access your scans and saved products.' :
                mode === 'signup' ? 'Join NutriScan AI to save and track your analyses.' :
                mode === 'forgot' ? "Enter your email address and we'll send you a password reset link." :
@@ -214,9 +224,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             {/* Success message */}
             {resetSent && (
               <div style={{
-                background: 'rgba(39,174,96,0.1)', border: '1px solid rgba(39,174,96,0.3)',
+                background: '#ECFDF5', border: '1px solid #A7F3D0',
                 borderRadius: '0.75rem', padding: '0.75rem 1rem', marginBottom: '1rem',
-                color: '#27AE60', fontSize: '0.85rem',
+                color: '#065F46', fontSize: '0.86rem', fontWeight: 500,
               }}>
                 Password reset link sent! Please check your email inbox.
               </div>
@@ -225,9 +235,9 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             {/* Error */}
             {error && (
               <div style={{
-                background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)',
+                background: '#FEF2F2', border: '1px solid #FECACA',
                 borderRadius: '0.75rem', padding: '0.75rem 1rem', marginBottom: '1rem',
-                color: '#E74C3C', fontSize: '0.85rem',
+                color: '#B91C1C', fontSize: '0.86rem',
               }}>
                 {error}
               </div>
@@ -254,7 +264,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                       type="button"
                       onClick={() => setShowPass(p => !p)}
                       aria-label={showPass ? 'Hide password' : 'Show password'}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#576574', padding: 0, display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', padding: 0, display: 'flex' }}
                     >
                       {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
@@ -262,26 +272,25 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                 />
 
                 {mode === 'login' && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.2rem' }}>
                     <button
                       type="button"
                       onClick={() => switchMode('forgot')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontSize: '0.8rem', fontWeight: 500 }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontSize: '0.82rem', fontWeight: 600 }}
                     >
                       Forgot password?
                     </button>
                   </div>
                 )}
 
-                <motion.button
+                <button
                   type="submit"
                   className="btn-primary"
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   disabled={loading}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', marginTop: '0.25rem' }}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', marginTop: '0.35rem', fontSize: '0.94rem' }}
                 >
                   {loading ? <Spinner size={18} color="white" /> : (mode === 'login' ? 'Sign In' : 'Create Account')}
-                </motion.button>
+                </button>
               </form>
             )}
 
@@ -290,15 +299,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
               <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <InputField icon={<Mail size={16} />} type="email" placeholder="Enter your registered email" value={email}
                   onChange={e => setEmail(e.target.value)} required />
-                <motion.button
+                <button
                   type="submit"
                   className="btn-primary"
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   disabled={loading}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', marginTop: '0.25rem' }}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', marginTop: '0.35rem', fontSize: '0.94rem' }}
                 >
                   {loading ? <Spinner size={18} color="white" /> : 'Send Reset Link'}
-                </motion.button>
+                </button>
               </form>
             )}
 
@@ -308,26 +316,26 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                 <InputField icon={<Phone size={16} />} type="tel" placeholder="+91 98765 43210"
                   value={phone} onChange={e => setPhone(e.target.value)} required />
                 <div id="recaptcha-container" ref={recaptchaContainerRef} />
-                <motion.button type="submit" className="btn-primary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                  disabled={loading} style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }}>
+                <button type="submit" className="btn-primary"
+                  disabled={loading} style={{ width: '100%', justifyContent: 'center', padding: '0.8rem', marginTop: '0.35rem' }}>
                   {loading ? <Spinner size={18} color="white" /> : 'Send OTP'}
-                </motion.button>
+                </button>
               </form>
             )}
 
             {mode === 'phone' && step === 'otp' && (
               <form onSubmit={handleVerifyOTP} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#576574' }}>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#4B5563' }}>
                   OTP sent to <strong>{phone}</strong>
                 </p>
                 <InputField icon={<Phone size={16} />} type="text" placeholder="Enter 6-digit OTP"
                   value={otp} onChange={e => setOtp(e.target.value)} maxLength={6} required />
-                <motion.button type="submit" className="btn-primary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                <button type="submit" className="btn-primary"
                   disabled={loading} style={{ width: '100%', justifyContent: 'center', padding: '0.8rem' }}>
                   {loading ? <Spinner size={18} color="white" /> : 'Verify OTP'}
-                </motion.button>
+                </button>
                 <button type="button" onClick={() => { setStep('input'); setOtp(''); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontSize: '0.85rem' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontSize: '0.85rem', fontWeight: 600 }}>
                   Change number
                 </button>
               </form>
@@ -337,51 +345,61 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
             {mode !== 'phone' && mode !== 'forgot' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
-                  <div style={{ flex: 1, height: 1, background: '#e8e4e0' }} />
-                  <span style={{ fontSize: '0.8rem', color: '#576574' }}>or continue with</span>
-                  <div style={{ flex: 1, height: 1, background: '#e8e4e0' }} />
+                  <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
+                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    or continue with
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   {/* Google */}
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleGoogle}
+                  <button onClick={handleGoogle}
                     disabled={loading}
                     style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                      background: 'white', border: '1.5px solid #e8e4e0', borderRadius: '0.75rem',
-                      padding: '0.7rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#2C3E50',
-                    }}>
+                      background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '0.75rem',
+                      padding: '0.7rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.86rem', color: '#0F172A',
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#FFFFFF'}
+                  >
                     <GoogleIcon /> Google
-                  </motion.button>
+                  </button>
                   {/* Phone */}
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => switchMode('phone')}
+                  <button onClick={() => switchMode('phone')}
                     style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                      background: 'white', border: '1.5px solid #e8e4e0', borderRadius: '0.75rem',
-                      padding: '0.7rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', color: '#2C3E50',
-                    }}>
-                    <Phone size={16} /> Phone
-                  </motion.button>
+                      background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '0.75rem',
+                      padding: '0.7rem', cursor: 'pointer', fontWeight: 600, fontSize: '0.86rem', color: '#0F172A',
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)', transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#FFFFFF'}
+                  >
+                    <Phone size={16} color="#0E3B2E" /> Phone
+                  </button>
                 </div>
               </>
             )}
 
-            {/* Switch mode */}
-            <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.85rem', color: '#576574' }}>
+            {/* Switch Mode Footer */}
+            <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.86rem', color: '#4B5563' }}>
               {mode === 'login' ? (
                 <>Don't have an account?{' '}
-                  <button onClick={() => switchMode('signup')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontWeight: 600 }}>Sign up</button>
+                  <button onClick={() => switchMode('signup')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontWeight: 700 }}>Sign up</button>
                 </>
               ) : mode === 'signup' ? (
                 <>Already have an account?{' '}
-                  <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontWeight: 600 }}>Sign in</button>
+                  <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontWeight: 700 }}>Sign in</button>
                 </>
               ) : mode === 'forgot' ? (
-                <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontWeight: 600 }}>
+                <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontWeight: 700 }}>
                   Back to sign in
                 </button>
               ) : (
-                <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4C5F4E', fontWeight: 600 }}>
+                <button onClick={() => switchMode('login')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0E3B2E', fontWeight: 700 }}>
                   Use email instead
                 </button>
               )}
@@ -397,17 +415,23 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
 function InputField({ icon, suffix, ...props }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.6rem',
-      background: '#FAF8F5', border: '1.5px solid #e8e4e0', borderRadius: '0.75rem',
-      padding: '0.7rem 1rem', transition: 'border-color 0.2s',
+      display: 'flex', alignItems: 'center', gap: '0.65rem',
+      background: '#F8FAFC', border: '1.5px solid #CBD5E1', borderRadius: '0.75rem',
+      padding: '0.7rem 1rem', transition: 'border-color 0.15s, box-shadow 0.15s',
     }}
-      onFocus={e => e.currentTarget.style.borderColor = '#4C5F4E'}
-      onBlur={e => e.currentTarget.style.borderColor = '#e8e4e0'}
+      onFocus={e => {
+        e.currentTarget.style.borderColor = '#0E3B2E';
+        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14, 59, 46, 0.1)';
+      }}
+      onBlur={e => {
+        e.currentTarget.style.borderColor = '#CBD5E1';
+        e.currentTarget.style.boxShadow = 'none';
+      }}
     >
-      <span style={{ color: '#576574', flexShrink: 0 }}>{icon}</span>
+      <span style={{ color: '#64748B', flexShrink: 0 }}>{icon}</span>
       <input {...props} style={{
         flex: 1, border: 'none', background: 'transparent', outline: 'none',
-        color: '#2C3E50', fontSize: '0.9rem', fontFamily: 'Inter, sans-serif',
+        color: '#0F172A', fontSize: '0.92rem', fontFamily: 'Inter, sans-serif',
       }} />
       {suffix}
     </div>

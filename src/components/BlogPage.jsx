@@ -1,7 +1,7 @@
-// Health & Nutrition Blog page
+// Health & Nutrition Blog page – Editorial research & consumer intelligence
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calendar, CheckCircle } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle, Clock, ShieldCheck, BookOpen } from 'lucide-react';
 import { PageWrapper, ModalOverlay } from './Shared.jsx';
 
 const ARTICLES = [
@@ -9,9 +9,10 @@ const ARTICLES = [
     id: 1,
     category: 'Food Safety',
     date: 'Sep 28, 2026',
+    readTime: '5 min read',
     title: 'Understanding Food Labels in India',
-    excerpt: 'Decoding FSSAI labels, ingredient lists, and nutritional tables on Indian packaged foods — what to look for and what to avoid.',
-    color: '#4C5F4E',
+    excerpt: 'Decoding FSSAI labels, ingredient lists, and nutritional tables on Indian packaged foods what to look for and what to avoid.',
+    color: '#0E3B2E',
     emoji: '🏷️',
     content: `Packaged food sales in India have grown more than 300% over the last decade. However, deciphering what actually goes into processed items remains tricky.
 
@@ -27,9 +28,10 @@ Pro Tip: Use NutriScan AI's camera scanner to instantly grade any packaged item 
     id: 2,
     category: 'Nutrition',
     date: 'Sep 20, 2026',
+    readTime: '4 min read',
     title: "The Truth About 'Sugar-Free' Claims",
-    excerpt: "Sugar-free doesn't mean calorie-free. Artificial sweeteners, hidden sugars, and the marketing tricks that fool consumers every day.",
-    color: '#E74C3C',
+    excerpt: "Sugarfree doesn't mean calorie-free. Artificial sweeteners, hidden sugars, and the marketing tricks that fool consumers every day.",
+    color: '#DC2626',
     emoji: '🍬',
     content: `Many beverages and sweets marketed as 'zero sugar' replace sucrose with non-nutritive sweeteners such as sucralose, aspartame, or acesulfame potassium.
 
@@ -44,9 +46,10 @@ Healthier Swaps: Choose natural whole foods, fresh fruits, or beverages infused 
     id: 3,
     category: 'Personal Care',
     date: 'Sep 12, 2026',
+    readTime: '6 min read',
     title: 'Navigating Personal Care Ingredients',
-    excerpt: 'Parabens, sulphates, phthalates — a complete guide to identifying harmful chemicals in your skincare, haircare, and cosmetic products.',
-    color: '#8e44ad',
+    excerpt: 'Parabens, sulphates, phthalate a complete guide to identifying harmful chemicals in your skincare, haircare, and cosmetic products.',
+    color: '#7C3AED',
     emoji: '🧴',
     content: `Your skin is your largest organ, absorbing a significant percentage of topical products. Here is our quick safety checklist:
 
@@ -60,11 +63,12 @@ NutriScan Care Scanner classifies all cosmetic ingredients according to internat
     id: 4,
     category: 'Wellness',
     date: 'Sep 5, 2026',
+    readTime: '5 min read',
     title: 'Supplements: What Science Actually Says',
-    excerpt: 'The booming supplement industry promises everything. Here is what clinical evidence confirms — and what is pure marketing hype.',
-    color: '#2980b9',
+    excerpt: 'The booming supplement industry promises everything. Here is what clinical evidence confirms and what is pure marketing hype.',
+    color: '#2563EB',
     emoji: '💊',
-    content: `While multivitamin gummies and herbal extracts flood the shelves, evidence suggests whole-food nutrition outperforms synthetic pills for most healthy individuals.
+    content: `While multivitamin gummies and herbal extracts flood the shelves, evidence suggests whole food nutrition outperforms synthetic pills for most healthy individuals.
 
 Proven Supplements:
 • Vitamin D3: Essential if you have limited sun exposure; blood test verification is recommended.
@@ -77,9 +81,10 @@ Always consult your physician before starting high-dose supplement regimens.`,
     id: 5,
     category: 'Clean Eating',
     date: 'Aug 29, 2026',
+    readTime: '4 min read',
     title: '10 Ultra-Processed Foods You Should Limit',
     excerpt: 'Ultra-processed foods now make up more than 50% of calories in many Indian households. Here are the key culprits and better swaps.',
-    color: '#F39C12',
+    color: '#D97706',
     emoji: '🛒',
     content: `Ultra-processed foods (Nova Group 4) undergo multiple industrial processes and contain formulations of industrial ingredients like hydrogenated oils, emulsifiers, and modified starches.
 
@@ -96,9 +101,10 @@ Simple swaps: Switch to rolled oats, boiled sprouts, homemade paneer, and season
     id: 6,
     category: 'Cooking',
     date: 'Aug 22, 2026',
-    title: 'Healthy Indian Cooking Oils — A Complete Guide',
-    excerpt: "Cold-pressed mustard, coconut, sesame — which oils are genuinely healthy and which ones are just expensive marketing?",
-    color: '#27AE60',
+    readTime: '7 min read',
+    title: 'Healthy Indian Cooking Oils A Complete Guide',
+    excerpt: "Cold-pressed mustard, coconut, sesame which oils are genuinely healthy and which ones are just expensive marketing?",
+    color: '#059669',
     emoji: '🫙',
     content: `Cooking oils differ in their fatty acid composition (MUFA, PUFA, SFA) and smoke point.
 
@@ -112,12 +118,12 @@ Our breakdown:
 
 const container = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.1 } },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 24 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
 };
 
 export default function BlogPage({ onNavigate }) {
@@ -139,173 +145,177 @@ export default function BlogPage({ onNavigate }) {
   };
 
   return (
-    <PageWrapper style={{ background: '#F8F4F0', minHeight: '100vh', paddingBottom: '6rem' }}>
-      <div style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1.25rem' }}>
+    <PageWrapper style={{ background: '#F8FAF9', minHeight: '100vh', paddingBottom: '6rem' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto', padding: '2.5rem 1.25rem' }}>
 
-        {/* Header */}
+        {/* Editorial Header */}
         <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
+          <div
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
-              background: 'rgba(76,95,78,0.1)', borderRadius: '99px',
-              padding: '0.35rem 1rem', marginBottom: '1rem',
+              display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+              background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '99px',
+              padding: '0.3rem 0.9rem', marginBottom: '1rem',
             }}
           >
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#4C5F4E' }}>📰 Latest Articles</span>
-          </motion.div>
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', margin: '0 0 0.75rem' }}
-          >
+            <BookOpen size={14} color="#059669" />
+            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#065F46' }}>
+              Evidence-Based Nutritional Research
+            </span>
+          </div>
+          <h1 style={{ fontSize: 'clamp(2rem, 4.5vw, 2.75rem)', margin: '0 0 0.75rem', color: '#0F172A', letterSpacing: '-0.02em' }}>
             Health & Nutrition Blog
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            style={{ color: '#576574', maxWidth: 520, margin: '0 auto', fontSize: '0.95rem', lineHeight: 1.7 }}
-          >
+          </h1>
+          <p style={{ color: '#4B5563', maxWidth: 580, margin: '0 auto', fontSize: '0.98rem', lineHeight: 1.65 }}>
             Stay informed with our latest articles on clean eating, safe products, and healthy living.
-          </motion.p>
+          </p>
         </div>
 
-        {/* Featured article */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+        {/* Featured Article Hero Card */}
+        <div
           className="card card-hover"
           onClick={() => setActiveArticle(ARTICLES[0])}
-          style={{ marginBottom: '2rem', padding: 0, overflow: 'hidden', cursor: 'pointer' }}
-          whileHover={{ y: -3 }}
+          style={{
+            marginBottom: '2.5rem', padding: 0, overflow: 'hidden', cursor: 'pointer',
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+            boxShadow: '0 8px 30px rgba(15, 23, 42, 0.05)',
+          }}
         >
           <div style={{
-            background: `linear-gradient(135deg, ${ARTICLES[0].color}22, ${ARTICLES[0].color}08)`,
+            background: 'linear-gradient(135deg, #0E3B2E 0%, #166534 100%)',
             padding: '2.5rem',
-            borderBottom: `4px solid ${ARTICLES[0].color}`,
+            color: '#FFFFFF',
+            position: 'relative',
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>{ARTICLES[0].emoji}</div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
               <span style={{
-                background: ARTICLES[0].color, color: 'white', borderRadius: '99px',
-                padding: '0.2rem 0.75rem', fontSize: '0.75rem', fontWeight: 600,
+                background: '#ECFDF5', color: '#065F46', borderRadius: '99px',
+                padding: '0.2rem 0.75rem', fontSize: '0.74rem', fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.04em',
               }}>{ARTICLES[0].category}</span>
-              <span style={{ color: '#576574', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Calendar size={12} /> {ARTICLES[0].date}
+              <span style={{ color: '#CBD5E1', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Calendar size={13} /> {ARTICLES[0].date}
+              </span>
+              <span style={{ color: '#A7F3D0', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Clock size={13} /> {ARTICLES[0].readTime}
               </span>
             </div>
-            <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.5rem' }}>{ARTICLES[0].title}</h2>
-            <p style={{ margin: '0 0 1.5rem', color: '#576574', lineHeight: 1.7 }}>{ARTICLES[0].excerpt}</p>
-            <motion.button
-              whileHover={{ scale: 1.04, x: 4 }} whileTap={{ scale: 0.97 }}
+            <h2 style={{ margin: '0 0 1rem', fontSize: 'clamp(1.5rem, 3vw, 2rem)', color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+              {ARTICLES[0].title}
+            </h2>
+            <p style={{ margin: '0 0 1.75rem', color: '#E2E8F0', lineHeight: 1.7, maxWidth: 720, fontSize: '1rem' }}>
+              {ARTICLES[0].excerpt}
+            </p>
+            <button
               onClick={(e) => { e.stopPropagation(); setActiveArticle(ARTICLES[0]); }}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                background: ARTICLES[0].color, color: 'white', border: 'none',
-                borderRadius: '0.75rem', padding: '0.6rem 1.25rem',
-                fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                background: '#FFFFFF', color: '#0E3B2E', border: 'none',
+                borderRadius: '0.75rem', padding: '0.65rem 1.4rem',
+                fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               }}
             >
-              Read More <ArrowRight size={14} />
-            </motion.button>
+              Read More <ArrowRight size={15} />
+            </button>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Article grid */}
+        {/* Article Grid */}
         <motion.div
           variants={container}
           initial="hidden"
           animate="show"
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '1.25rem',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1.5rem',
           }}
         >
           {ARTICLES.slice(1).map((article) => (
             <motion.div
               key={article.id}
               variants={item}
-              whileHover={{ y: -4, boxShadow: '0 12px 40px rgba(76,95,78,0.15)' }}
               onClick={() => setActiveArticle(article)}
-              className="card"
-              style={{ cursor: 'pointer', padding: 0, overflow: 'hidden', transition: 'box-shadow 0.2s' }}
+              className="card card-hover"
+              style={{
+                cursor: 'pointer', padding: 0, overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+                border: '1px solid rgba(15, 23, 42, 0.08)',
+              }}
             >
-              {/* Color top bar */}
-              <div style={{
-                height: 6,
-                background: `linear-gradient(90deg, ${article.color}, ${article.color}99)`,
-              }} />
-              <div style={{ padding: '1.25rem' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>{article.emoji}</div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+              {/* Clean category header bar */}
+              <div style={{ height: 4, background: article.color }} />
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
                   <span style={{
-                    background: `${article.color}18`, color: article.color,
-                    border: `1px solid ${article.color}33`,
-                    borderRadius: '99px', padding: '0.15rem 0.65rem', fontSize: '0.72rem', fontWeight: 600,
+                    background: `${article.color}14`, color: article.color,
+                    border: `1px solid ${article.color}30`,
+                    borderRadius: '99px', padding: '0.15rem 0.65rem', fontSize: '0.72rem', fontWeight: 700,
                   }}>{article.category}</span>
-                  <span style={{ color: '#576574', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <Calendar size={10} /> {article.date}
+                  <span style={{ color: '#64748B', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Calendar size={11} /> {article.date}
                   </span>
                 </div>
-                <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', lineHeight: 1.4 }}>{article.title}</h3>
-                <p style={{ margin: '0 0 1.25rem', color: '#576574', fontSize: '0.83rem', lineHeight: 1.6 }}>
-                  {article.excerpt.slice(0, 110)}…
+                <h3 style={{ margin: '0 0 0.65rem', fontSize: '1.1rem', lineHeight: 1.35, color: '#0F172A', fontWeight: 700 }}>
+                  {article.title}
+                </h3>
+                <p style={{ margin: '0 0 1.25rem', color: '#4B5563', fontSize: '0.86rem', lineHeight: 1.6, flex: 1 }}>
+                  {article.excerpt}
                 </p>
-                <motion.button
-                  whileHover={{ x: 3 }}
+                <button
                   onClick={(e) => { e.stopPropagation(); setActiveArticle(article); }}
                   style={{
-                    background: 'none', border: 'none', color: article.color, fontWeight: 600,
-                    fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
-                    fontFamily: 'Inter, sans-serif', padding: 0,
+                    background: 'none', border: 'none', color: article.color, fontWeight: 700,
+                    fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem',
+                    fontFamily: 'Inter, sans-serif', padding: 0, marginTop: 'auto',
                   }}
                 >
-                  Read More <ArrowRight size={13} />
-                </motion.button>
+                  Read More <ArrowRight size={14} />
+                </button>
               </div>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* Newsletter CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.2 }}
+        {/* Newsletter Editorial CTA */}
+        <div
           style={{
-            marginTop: '3rem', background: 'linear-gradient(135deg, #4C5F4E 0%, #3a4e3c 100%)',
-            borderRadius: '1.5rem', padding: '2.5rem', textAlign: 'center', color: 'white',
+            marginTop: '3.5rem', background: '#0E3B2E',
+            borderRadius: '1.25rem', padding: '3rem 2rem', textAlign: 'center', color: '#FFFFFF',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 16px 48px -12px rgba(14, 59, 46, 0.3)',
           }}
         >
-          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📬</div>
-          <h2 style={{ margin: '0 0 0.5rem', color: 'white', fontSize: '1.4rem' }}>Stay Updated</h2>
-          <p style={{ margin: '0 0 1.5rem', opacity: 0.8, fontSize: '0.9rem' }}>
-            Get the latest nutrition tips and product safety alerts in your inbox.
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem',
+          }}>
+            <ShieldCheck size={22} color="#86EFAC" />
+          </div>
+          <h2 style={{ margin: '0 0 0.5rem', color: '#FFFFFF', fontSize: '1.6rem', fontFamily: 'Outfit, sans-serif' }}>
+            Stay Updated
+          </h2>
+          <p style={{ margin: '0 auto 1.75rem', color: '#CBD5E1', fontSize: '0.94rem', maxWidth: 460, lineHeight: 1.6 }}>
+            Get the latest nutrition tips and product safety alerts in your inbox. No marketing fluff — only peer-reviewed insights.
           </p>
 
           {newsletterSubscribed ? (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               style={{
-                background: 'rgba(255,255,255,0.15)', borderRadius: '1rem',
-                padding: '1rem 1.5rem', maxWidth: 420, margin: '0 auto',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '0.875rem', padding: '1.1rem 1.75rem', maxWidth: 440, margin: '0 auto',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.65rem',
               }}
             >
-              <CheckCircle size={20} color="#2ECC71" />
-              <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>
+              <CheckCircle size={20} color="#4ADE80" />
+              <span style={{ fontWeight: 600, fontSize: '0.94rem', color: '#FFFFFF' }}>
                 🎉 You're subscribed! Welcome to our wellness community.
               </span>
             </motion.div>
           ) : (
-            <form onSubmit={handleSubscribe} style={{ display: 'flex', gap: '0.6rem', maxWidth: 420, margin: '0 auto', flexWrap: 'wrap' }}>
+            <form onSubmit={handleSubscribe} style={{ display: 'flex', gap: '0.6rem', maxWidth: 460, margin: '0 auto', flexWrap: 'wrap' }}>
               <input
                 type="email"
                 value={newsletterEmail}
@@ -314,62 +324,64 @@ export default function BlogPage({ onNavigate }) {
                 aria-label="Newsletter email address"
                 required
                 style={{
-                  flex: 1, border: '2px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.15)',
-                  borderRadius: '0.75rem', padding: '0.7rem 1rem', outline: 'none', color: 'white',
-                  fontFamily: 'Inter, sans-serif', fontSize: '0.9rem', minWidth: 200,
+                  flex: '1 1 240px', border: '1.5px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '0.75rem', padding: '0.75rem 1.1rem', outline: 'none', color: '#FFFFFF',
+                  fontFamily: 'Inter, sans-serif', fontSize: '0.92rem',
                 }}
               />
-              <motion.button
+              <button
                 type="submit"
-                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
                 style={{
-                  background: 'white', color: '#4C5F4E', border: 'none', borderRadius: '0.75rem',
-                  padding: '0.7rem 1.25rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                  background: '#FFFFFF', color: '#0E3B2E', border: 'none', borderRadius: '0.75rem',
+                  padding: '0.75rem 1.5rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                  fontSize: '0.92rem', transition: 'background-color 0.15s',
                 }}
               >
                 Subscribe
-              </motion.button>
+              </button>
               {newsletterError && (
-                <div style={{ width: '100%', color: '#FFB8B8', fontSize: '0.8rem', marginTop: '0.25rem' }}>
+                <div style={{ width: '100%', color: '#FCA5A5', fontSize: '0.82rem', marginTop: '0.35rem', textAlign: 'left' }}>
                   {newsletterError}
                 </div>
               )}
             </form>
           )}
-        </motion.div>
+        </div>
       </div>
 
-      {/* Article Detail Modal */}
-      <ModalOverlay isOpen={Boolean(activeArticle)} onClose={() => setActiveArticle(null)} maxWidth="640px">
+      {/* Article Detail Reading Modal */}
+      <ModalOverlay isOpen={Boolean(activeArticle)} onClose={() => setActiveArticle(null)} maxWidth="680px">
         {activeArticle && (
           <div>
-            <div style={{ fontSize: '3rem', marginBottom: '0.75rem' }}>{activeArticle.emoji}</div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{
                 background: activeArticle.color, color: 'white', borderRadius: '99px',
-                padding: '0.2rem 0.75rem', fontSize: '0.75rem', fontWeight: 600,
+                padding: '0.25rem 0.85rem', fontSize: '0.76rem', fontWeight: 700,
               }}>{activeArticle.category}</span>
-              <span style={{ color: '#576574', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <Calendar size={12} /> {activeArticle.date}
+              <span style={{ color: '#64748B', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Calendar size={13} /> {activeArticle.date}
+              </span>
+              <span style={{ color: '#64748B', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Clock size={13} /> {activeArticle.readTime || '5 min read'}
               </span>
             </div>
-            <h2 style={{ margin: '0 0 1rem', fontSize: '1.4rem', color: '#2C3E50', lineHeight: 1.3 }}>
+            <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.65rem', color: '#0F172A', lineHeight: 1.3, letterSpacing: '-0.02em' }}>
               {activeArticle.title}
             </h2>
             <div style={{
-              color: '#34495E', fontSize: '0.92rem', lineHeight: 1.75,
-              whiteSpace: 'pre-wrap', marginBottom: '1.5rem',
+              color: '#334155', fontSize: '0.96rem', lineHeight: 1.8,
+              whiteSpace: 'pre-wrap', marginBottom: '2rem',
+              borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem',
             }}>
               {activeArticle.content || activeArticle.excerpt}
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <motion.button
-                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+              <button
                 className="btn-primary"
                 onClick={() => { setActiveArticle(null); onNavigate?.('home'); }}
               >
                 🔍 Analyze a Product Now
-              </motion.button>
+              </button>
               <button
                 className="btn-secondary"
                 onClick={() => setActiveArticle(null)}
@@ -383,4 +395,3 @@ export default function BlogPage({ onNavigate }) {
     </PageWrapper>
   );
 }
-

@@ -1,7 +1,7 @@
 // Product Details Page – AI product analysis result
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bookmark } from 'lucide-react';
+import { ArrowLeft, Bookmark, Share2, Check, ShieldAlert } from 'lucide-react';
 import { GradeBadge, IngredientRow, PageWrapper } from './Shared.jsx';
 import { analyzeProductAI } from '../services/gemini.js';
 import { db, APP_ID } from '../firebaseConfig.js';
@@ -51,6 +51,8 @@ export default function ProductDetailsPage({ data, onNavigate, user }) {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [savingDoc, setSavingDoc] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [filterClass, setFilterClass] = useState('all'); // all | safe | limited | harmful
 
   useEffect(() => {
     let cancelled = false;
@@ -130,159 +132,256 @@ export default function ProductDetailsPage({ data, onNavigate, user }) {
     }
   };
 
+  const handleCopyLink = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const filteredIngredients = product?.ingredients?.filter(ing => {
+    if (filterClass === 'all') return true;
+    return ing.classification === filterClass;
+  }) || [];
+
   return (
-    <PageWrapper style={{ background: '#F8F4F0', minHeight: '100vh', paddingBottom: '5rem' }}>
-      {/* Header bar */}
+    <PageWrapper style={{ background: '#F8FAF9', minHeight: '100vh', paddingBottom: '5rem' }}>
+      {/* ── Sticky Laboratory Header Bar ──────────────────────────────── */}
       <div style={{
-        background: 'white', padding: '1rem 1.5rem',
-        display: 'flex', alignItems: 'center', gap: '1rem',
-        borderBottom: '1px solid rgba(76,95,78,0.08)',
+        background: '#FFFFFF', padding: '0.85rem 1.5rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
         position: 'sticky', top: 64, zIndex: 10,
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
       }}>
-        <button
-          onClick={() => onNavigate('home')}
-          aria-label="Back to home search"
-          style={{
-            background: '#f0ece8', border: 'none', borderRadius: '50%',
-            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#2C3E50',
-          }}
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <h2 style={{ margin: 0, fontSize: '1rem', fontFamily: 'Outfit, sans-serif' }}>
-          {loading ? 'Analyzing…' : (product?.name || 'Product Analysis')}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+          <button
+            onClick={() => onNavigate('home')}
+            aria-label="Back to home search"
+            style={{
+              background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '50%',
+              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#1E293B', transition: 'background-color 0.15s',
+            }}
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Safety Evaluation Report
+            </div>
+            <h2 style={{ margin: 0, fontSize: '0.98rem', fontFamily: 'Outfit, sans-serif', color: '#0F172A', fontWeight: 700 }}>
+              {loading ? 'Evaluating ingredients…' : (product?.name || 'Product Analysis')}
+            </h2>
+          </div>
+        </div>
+
+        {/* Action icons */}
+        {!loading && product && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={handleCopyLink}
+              title="Copy shareable report link"
+              style={{
+                background: copied ? '#ECFDF5' : '#F1F5F9',
+                border: '1px solid',
+                borderColor: copied ? '#A7F3D0' : '#E2E8F0',
+                borderRadius: '0.65rem', padding: '0.45rem 0.75rem',
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                cursor: 'pointer', color: copied ? '#065F46' : '#475569',
+                fontSize: '0.8rem', fontWeight: 600,
+              }}
+            >
+              {copied ? <Check size={14} /> : <Share2 size={14} />}
+              <span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
+            </button>
+            <button
+              onClick={toggleBookmark}
+              disabled={savingDoc}
+              aria-label={saved ? 'Remove from saved products' : 'Save product to profile'}
+              title={saved ? 'Saved to profile' : 'Save product'}
+              style={{
+                background: saved ? '#ECFDF5' : '#F1F5F9',
+                border: '1px solid',
+                borderColor: saved ? '#A7F3D0' : '#E2E8F0',
+                borderRadius: '0.65rem', padding: '0.45rem 0.75rem',
+                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                cursor: 'pointer', color: saved ? '#065F46' : '#475569',
+                fontSize: '0.8rem', fontWeight: 600,
+              }}
+            >
+              <Bookmark size={15} color={saved ? '#059669' : '#475569'} fill={saved ? '#059669' : 'none'} />
+              <span className="hidden sm:inline">{saved ? 'Saved' : 'Save'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      <div style={{ maxWidth: 760, margin: '0 auto', padding: '1.5rem' }}>
-        {/* Loading */}
+      <div style={{ maxWidth: 840, margin: '0 auto', padding: '1.75rem 1.25rem' }}>
+        {/* Loading State */}
         {loading && (
           <div style={{ textAlign: 'center', padding: '5rem 1rem' }}>
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
-              style={{ width: 64, height: 64, margin: '0 auto 1.5rem', borderRadius: '50%',
-                border: '4px solid rgba(76,95,78,0.15)', borderTopColor: '#4C5F4E' }}
-            />
-            <p style={{ color: '#576574', fontWeight: 500 }}>
-              {data?.imageBase64 ? '🔍 AI is reading your image…' : '🤖 AI is analyzing product…'}
+            <div className="spinner" style={{ width: 44, height: 44, margin: '0 auto 1.5rem', borderWidth: 3.5 }} />
+            <h3 style={{ color: '#0F172A', fontSize: '1.15rem', marginBottom: '0.4rem' }}>
+              {data?.imageBase64 ? 'Scanning label typography & barcodes…' : 'Synthesizing ingredient toxicology…'}
+            </h3>
+            <p style={{ color: '#64748B', fontSize: '0.88rem', maxWidth: 440, margin: '0 auto' }}>
+              Cross-referencing food additives, emulsifiers, and preservative compounds against scientific safety registries…
             </p>
-            <p style={{ color: '#576574', fontSize: '0.85rem' }}>This usually takes a few seconds</p>
           </div>
         )}
 
-        {/* Error */}
+        {/* Error State */}
         {!loading && error && (
           <div style={{
-            background: 'rgba(231,76,60,0.08)', border: '1px solid rgba(231,76,60,0.2)',
-            borderRadius: '1rem', padding: '2rem', textAlign: 'center',
+            background: '#FEF2F2', border: '1px solid #FECACA',
+            borderRadius: '1.125rem', padding: '2.5rem 1.5rem', textAlign: 'center',
           }}>
-            <p style={{ color: '#E74C3C', fontWeight: 600, marginBottom: '1rem' }}>{error}</p>
-            <button className="btn-primary" onClick={() => onNavigate('home')}>← Back to Search</button>
+            <ShieldAlert size={36} color="#DC2626" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+            <h3 style={{ color: '#991B1B', margin: '0 0 0.5rem', fontSize: '1.1rem' }}>Analysis Incomplete</h3>
+            <p style={{ color: '#7F1D1D', fontSize: '0.88rem', marginBottom: '1.5rem', maxWidth: 440, margin: '0 auto 1.5rem' }}>
+              {error}
+            </p>
+            <button className="btn-primary" onClick={() => onNavigate('home')}>
+              ← Back to Search
+            </button>
           </div>
         )}
 
-        {/* Result */}
+        {/* Product Results */}
         {!loading && product && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-            {/* Overview card */}
-            <div className="card" style={{ marginBottom: '1.25rem', padding: '1.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', flexWrap: 'wrap' }}>
-                <GradeBadge grade={product.healthGrade} size={88} />
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', color: '#2C3E50' }}>{product.name}</h1>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                        onClick={toggleBookmark}
-                        disabled={savingDoc}
-                        aria-label={saved ? 'Remove from saved products' : 'Save product to profile'}
-                        title={saved ? 'Saved to profile' : 'Save product'}
-                        style={{
-                          background: saved ? 'rgba(76,95,78,0.1)' : '#f0ece8', border: 'none', borderRadius: '50%',
-                          width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                        }}
-                      >
-                        <Bookmark size={16} color={saved ? '#4C5F4E' : '#576574'} fill={saved ? '#4C5F4E' : 'none'} />
-                      </motion.button>
-                    </div>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
+            {/* Primary Overview Card */}
+            <div className="card" style={{ marginBottom: '1.5rem', padding: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <GradeBadge grade={product.healthGrade} size={92} />
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
+                    <h1 style={{ margin: '0 0 0.5rem', fontSize: '1.65rem', color: '#0F172A', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                      {product.name}
+                    </h1>
                   </div>
-                  <p style={{ margin: 0, color: '#576574', fontSize: '0.9rem', lineHeight: 1.6 }}>{product.summary}</p>
 
-                  {/* Grade label */}
-                  <div style={{ marginTop: '0.85rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {/* Scientific Evaluation Tags */}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                     <span style={{
-                      background: 'rgba(76,95,78,0.1)', color: '#4C5F4E',
-                      borderRadius: '99px', padding: '0.25rem 0.75rem', fontSize: '0.78rem', fontWeight: 600,
+                      background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0',
+                      borderRadius: '99px', padding: '0.25rem 0.85rem', fontSize: '0.78rem', fontWeight: 600,
                     }}>
                       Health Grade: {product.healthGrade}
                     </span>
                     <span style={{
-                      background: '#f0ece8', color: '#576574',
-                      borderRadius: '99px', padding: '0.25rem 0.75rem', fontSize: '0.78rem', fontWeight: 500,
+                      background: '#F1F5F9', color: '#334155', border: '1px solid #E2E8F0',
+                      borderRadius: '99px', padding: '0.25rem 0.85rem', fontSize: '0.78rem', fontWeight: 500,
                     }}>
                       {product.ingredients.length} ingredients analyzed
                     </span>
+                    <span style={{
+                      background: '#F8FAFC', color: '#475569', border: '1px solid #E2E8F0',
+                      borderRadius: '99px', padding: '0.25rem 0.85rem', fontSize: '0.78rem', fontWeight: 500,
+                    }}>
+                      Category: {data?.type === 'care' ? 'Personal Care' : data?.type === 'health' ? 'Health Supplement' : 'Packaged Food'}
+                    </span>
                   </div>
+
+                  <p style={{ margin: 0, color: '#475569', fontSize: '0.94rem', lineHeight: 1.65 }}>
+                    {product.summary}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Ingredient Analysis */}
-            <div className="card" style={{ marginBottom: '1.25rem' }}>
-              <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                🧪 Ingredient Analysis
-              </h2>
-              {product.ingredients.length === 0 ? (
-                <p style={{ color: '#576574', fontSize: '0.9rem' }}>No ingredient data available.</p>
-              ) : (
-                <div>
-                  {/* Legend */}
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {[['safe', '#27AE60'], ['limited', '#F39C12'], ['harmful', '#E74C3C']].map(([cls, clr]) => (
-                      <span key={cls} style={{
-                        display: 'flex', alignItems: 'center', gap: '0.35rem',
-                        fontSize: '0.75rem', color: clr, fontWeight: 600,
-                        background: `${clr}18`, borderRadius: '99px', padding: '0.2rem 0.65rem',
-                        border: `1px solid ${clr}44`,
-                      }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: clr, display: 'inline-block' }} />
-                        {cls.charAt(0).toUpperCase() + cls.slice(1)}
-                      </span>
-                    ))}
-                  </div>
-                  {product.ingredients.map((ing, i) => (
-                    <IngredientRow key={i} ingredient={ing} index={i} />
+            {/* Ingredient Breakdown Card */}
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <h2 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0F172A' }}>
+                  🧪 Ingredient Analysis
+                </h2>
+
+                {/* Filter Pills */}
+                <div style={{ display: 'flex', gap: '0.35rem', background: '#F1F5F9', padding: '0.25rem', borderRadius: '0.65rem' }}>
+                  {[
+                    { id: 'all', label: `All (${product.ingredients.length})` },
+                    { id: 'safe', label: `Safe (${product.ingredients.filter(i => i.classification === 'safe').length})` },
+                    { id: 'limited', label: `Caution (${product.ingredients.filter(i => i.classification === 'limited').length})` },
+                    { id: 'harmful', label: `Harmful (${product.ingredients.filter(i => i.classification === 'harmful').length})` },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setFilterClass(tab.id)}
+                      style={{
+                        background: filterClass === tab.id ? '#FFFFFF' : 'transparent',
+                        border: 'none', borderRadius: '0.45rem',
+                        padding: '0.25rem 0.65rem', fontSize: '0.74rem',
+                        fontWeight: filterClass === tab.id ? 700 : 500,
+                        color: filterClass === tab.id ? '#0F172A' : '#64748B',
+                        cursor: 'pointer', boxShadow: filterClass === tab.id ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                      }}
+                    >
+                      {tab.label}
+                    </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Legend Strip */}
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.1rem', paddingBottom: '0.85rem', borderBottom: '1px solid #F1F5F9' }}>
+                {[
+                  ['safe', '#059669', 'Recognized Safe & Clean'],
+                  ['limited', '#D97706', 'Moderate Intake Caution'],
+                  ['harmful', '#DC2626', 'Flagged Health Concern'],
+                ].map(([cls, clr, desc]) => (
+                  <span key={cls} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    fontSize: '0.76rem', color: '#475569', fontWeight: 500,
+                  }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: clr, display: 'inline-block' }} />
+                    <strong style={{ color: clr, textTransform: 'capitalize' }}>{cls}:</strong> {desc}
+                  </span>
+                ))}
+              </div>
+
+              {/* List */}
+              {filteredIngredients.length === 0 ? (
+                <p style={{ color: '#64748B', fontSize: '0.88rem', margin: '1rem 0' }}>
+                  No ingredients match this filter criteria.
+                </p>
+              ) : (
+                filteredIngredients.map((ing, i) => (
+                  <IngredientRow key={i} ingredient={ing} index={i} />
+                ))
               )}
             </div>
 
-            {/* Better Alternatives */}
+            {/* Better Alternatives Card */}
             {product.alternatives.length > 0 && (
               <div className="card">
-                <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h2 style={{ margin: '0 0 1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0F172A' }}>
                   ✅ Better Alternatives
                 </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
                   {product.alternatives.map((alt, i) => (
                     <motion.div
                       key={i}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.08, duration: 0.3 }}
                       style={{
-                        borderLeft: '3px solid #4C5F4E',
-                        paddingLeft: '1rem',
-                        background: 'rgba(76,95,78,0.04)',
-                        borderRadius: '0 0.75rem 0.75rem 0',
-                        padding: '0.85rem 1rem',
+                        borderLeft: '4px solid #166534',
+                        background: '#F0FDF4',
+                        border: '1px solid #BBF7D0',
+                        borderLeftWidth: '4px',
+                        borderRadius: '0.875rem',
+                        padding: '1rem 1.15rem',
                       }}
                     >
-                      <div style={{ fontWeight: 600, color: '#2C3E50', marginBottom: '0.25rem' }}>{alt.name}</div>
-                      <div style={{ color: '#576574', fontSize: '0.85rem' }}>{alt.reason}</div>
+                      <div style={{ fontWeight: 700, color: '#14532D', marginBottom: '0.3rem', fontSize: '0.94rem' }}>
+                        {alt.name}
+                      </div>
+                      <div style={{ color: '#166534', fontSize: '0.84rem', lineHeight: 1.55 }}>
+                        {alt.reason}
+                      </div>
                     </motion.div>
                   ))}
                 </div>
