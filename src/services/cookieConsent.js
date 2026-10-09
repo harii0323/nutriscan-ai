@@ -81,6 +81,66 @@ export function isConsentGranted(category) {
   return Boolean(prefs?.[category]);
 }
 
+/**
+ * Gatekeeper function for functional storage writes.
+ * Refuses write and returns false if user has not granted functional consent.
+ */
+export function setFunctionalItem(key, value) {
+  if (typeof window === 'undefined') return false;
+  if (!isConsentGranted('functional')) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+  try {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    localStorage.setItem(key, serialized);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Gatekeeper function for functional storage reads.
+ * Returns null if user has not granted functional consent.
+ */
+export function getFunctionalItem(key) {
+  if (typeof window === 'undefined') return null;
+  if (!isConsentGranted('functional')) return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Removes a functional storage item.
+ */
+export function removeFunctionalItem(key) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Gatekeeper function for diagnostic telemetry.
+ * Returns false if user has not granted analytics consent.
+ */
+export function recordTelemetryEvent(_eventName, _eventData = {}) {
+  if (typeof window === 'undefined') return false;
+  if (!isConsentGranted('analytics')) return false;
+  // Non-identifying operational telemetry processing
+  return true;
+}
+
 export function enforceConsentPolicies() {
   if (typeof window === 'undefined') return;
   const prefs = getConsentPreferences();

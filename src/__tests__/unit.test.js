@@ -233,15 +233,56 @@ describe('Unit Tests: Cookie Consent Lifecycle & Enforcement', () => {
     expect(isConsentGranted('strictlyNecessary')).toBe(true);
     expect(localStorage.getItem('nutriscan_ui_prefs')).toBeNull();
   });
+
+  it('gatekeeper setFunctionalItem and getFunctionalItem strictly block storage operations when consent denied', async () => {
+    const {
+      rejectOptionalCookies,
+      acceptAllCookies,
+      setFunctionalItem,
+      getFunctionalItem,
+      removeFunctionalItem,
+    } = await import('../services/cookieConsent.js');
+
+    // Deny consent
+    rejectOptionalCookies();
+    const writeResult = setFunctionalItem('test_pref', { theme: 'dark' });
+    expect(writeResult).toBe(false);
+    expect(getFunctionalItem('test_pref')).toBeNull();
+    expect(localStorage.getItem('test_pref')).toBeNull();
+
+    // Grant consent
+    acceptAllCookies();
+    const writeAllowed = setFunctionalItem('test_pref', { theme: 'dark' });
+    expect(writeAllowed).toBe(true);
+    expect(getFunctionalItem('test_pref')).toBe(JSON.stringify({ theme: 'dark' }));
+
+    // Clean up
+    removeFunctionalItem('test_pref');
+    expect(getFunctionalItem('test_pref')).toBeNull();
+  });
+
+  it('gatekeeper recordTelemetryEvent strictly ignores telemetry when analytics consent denied', async () => {
+    const { rejectOptionalCookies, acceptAllCookies, recordTelemetryEvent } = await import('../services/cookieConsent.js');
+    rejectOptionalCookies();
+    expect(recordTelemetryEvent('api_latency', { ms: 120 })).toBe(false);
+
+    acceptAllCookies();
+    expect(recordTelemetryEvent('api_latency', { ms: 120 })).toBe(true);
+  });
 });
 
 describe('Unit Tests: Business Configuration Audit', () => {
-  it('identifies unconfigured placeholder fields', async () => {
+  it('identifies unconfigured placeholder fields in audit mode', async () => {
     const { validateBusinessConfiguration } = await import('../config/businessConfig.js');
     const result = validateBusinessConfiguration(false);
     expect(typeof result.valid).toBe('boolean');
     expect(Array.isArray(result.issues)).toBe(true);
     expect(result.issues.some(i => i.field === 'legalName')).toBe(true);
+  });
+
+  it('strictly throws an error in strict mode when placeholders are detected', async () => {
+    const { validateBusinessConfiguration } = await import('../config/businessConfig.js');
+    expect(() => validateBusinessConfiguration(true)).toThrow(/Production Business Configuration Validation Failed/);
   });
 });
 

@@ -5,10 +5,20 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      strict_release_gate:
+        description: 'Enforce strict verified business configuration gate'
+        required: false
+        default: 'true'
+        type: boolean
+
+permissions:
+  contents: read
 
 jobs:
   security-and-build:
-    name: Lint, Test, Build & Secret Audit
+    name: Lint, Audit, Test, Build & Secret Scan
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -22,26 +32,53 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install Frontend Dependencies
+      - name: Install Frontend Dependencies (Clean Lockfile)
         run: npm ci
 
-      - name: Install Functions Dependencies
+      - name: Install Cloud Functions Dependencies
         run: npm --prefix functions ci
+
+      - name: Dependency Vulnerability Audit (High/Critical)
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
       - name: Code Quality & Linting (Oxlint)
         run: npm run lint
 
-      - name: Business & Legal Configuration Audit
+      - name: Business Configuration Audit (Non-Strict CI Mode)
         run: npm run validate:config
 
-      - name: Backend Type-Check & Compilation
+      - name: Backend TypeScript Compilation
         run: npm run build:functions
 
-      - name: Automated Unit, Integration & Security Tests
+      - name: Security & Authorization Tests
+        run: npm run test:security
+
+      - name: Complete Automated Test Suite
         run: npm run test:fast
 
-      - name: Production Frontend Build (Vite)
+      - name: Production Frontend Bundle Build (Vite)
         run: npm run build
 
       - name: Production Asset Secret Scanner
         run: npm run scan:secrets
+
+  production-release-gate:
+    name: Strict Production Operator Verification Gate
+    runs-on: ubuntu-latest
+    needs: [security-and-build]
+    if: github.event_name == 'workflow_dispatch' && inputs.strict_release_gate == true
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Enforce Strict Business Details Gate
+        run: npm run validate:config:strict

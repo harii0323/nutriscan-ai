@@ -1,13 +1,13 @@
-// User Profile Page – Member dashboard, history, and DPDP-compliant data controls
+// User Profile Page - Member dashboard, history, and DPDP-compliant data controls
 import React, { useState, useEffect } from 'react';
 import {
   Edit2, Bookmark, Clock, LogOut, User, Mail, ChevronRight,
   Download, Trash2, Shield, Settings, AlertTriangle, Search
 } from 'lucide-react';
 import { PageWrapper, EmptyState, GradeBadge, ModalOverlay } from './Shared.jsx';
-import { updateProfile, deleteUser } from 'firebase/auth';
+import { updateProfile } from 'firebase/auth';
 import { db, auth, APP_ID } from '../firebaseConfig.js';
-import { collection, getDocs, query, orderBy, limit, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import CookieConsentBanner from './CookieConsentBanner.jsx';
 
 export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavigate }) {
@@ -147,47 +147,27 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
     const BACKEND_URL = RAW_BACKEND_URL.replace(/\/$/, '') || '/api';
 
     try {
-      let serverDeleted = false;
-      // 1. Try server-side authorized complete deletion workflow
-      try {
-        const idToken = await auth.currentUser?.getIdToken();
-        if (idToken) {
-          const res = await fetch(`${BACKEND_URL}/deleteAccount`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${idToken}`,
-            },
-          });
-          if (res.ok) {
-            serverDeleted = true;
-          }
-        }
-      } catch (backendErr) {
-        console.warn('Backend deletion call skipped/failed, proceeding with direct fallback:', backendErr);
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        throw new Error('No authenticated user session found.');
       }
 
-      // 2. Direct fallback if server-side endpoint not deployed or reached
-      if (!serverDeleted) {
-        // Delete all saved products in Firestore
-        const savedRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'savedProducts');
-        const savedSnap = await getDocs(savedRef);
-        for (const d of savedSnap.docs) {
-          await deleteDoc(d.ref);
+      // Force refresh token to ensure fresh claims for sensitive erasure operation
+      const idToken = await currentUser.getIdToken(true);
+      const res = await fetch(`${BACKEND_URL}/deleteAccount`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          throw new Error('Your session has expired. Please sign out and sign in again before deleting your account.');
         }
-
-        // Delete all scans in Firestore
-        const scansRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'scans');
-        const scansSnap = await getDocs(scansRef);
-        for (const d of scansSnap.docs) {
-          await deleteDoc(d.ref);
-        }
-
-        // Delete user document in Firestore
-        await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
-
-        // Delete user account in Firebase Auth
-        await deleteUser(auth.currentUser || user);
+        throw new Error(errData.error || `Server account erasure failed with status ${res.status}.`);
       }
 
       setDeleteModalOpen(false);
@@ -197,7 +177,7 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
       if (err?.code === 'auth/requires-recent-login') {
         setDeleteError('For security, your credentials require re-authentication. Please sign out and sign back in before requesting account deletion.');
       } else {
-        setDeleteError(err?.message || 'Failed to delete account. Please contact support.');
+        setDeleteError(err?.message || 'Failed to delete account. Please try again or contact support.');
       }
     } finally {
       setDeletingAccount(false);

@@ -68,4 +68,30 @@ describe('Security & Environment Tests', () => {
     expect(rules).toContain('isAdmin');
     expect(rules).toContain('role');
   });
+
+  it('ensures backend functions do not contain wildcard suffix CORS checks', () => {
+    const fnIndexPath = path.join(rootDir, 'functions/src/index.ts');
+    const fnIndex = fs.readFileSync(fnIndexPath, 'utf8');
+    expect(fnIndex).not.toContain(".endsWith('.onrender.com')");
+    expect(fnIndex).not.toContain(".endsWith('.web.app')");
+    expect(fnIndex).not.toContain(".endsWith('.firebaseapp.com')");
+  });
+
+  it('ensures no private credentials or Gemini API keys are present across any src/ files', () => {
+    const srcDir = path.join(rootDir, 'src');
+    function checkDir(dir) {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          checkDir(full);
+        } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name)) {
+          const content = fs.readFileSync(full, 'utf8');
+          expect(content).not.toMatch(/AIza[0-9A-Za-z-_]{35}/);
+          expect(content).not.toMatch(/AQ\.[0-9A-Za-z-_]{40,}/);
+        }
+      }
+    }
+    checkDir(srcDir);
+  });
 });

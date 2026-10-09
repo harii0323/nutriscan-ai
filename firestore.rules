@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─── Authentication & Ownership Helpers ─────────────────────────────────────
+    // --- Authentication & Ownership Helpers ---------------------------------
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -11,46 +11,65 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Prevent client escalation of privileges or tampering with system fields
+    // Prevent privilege escalation and tampering with sensitive role or system fields
     function notModifyingProtectedFields() {
       return !('isAdmin' in request.resource.data) &&
              !('role' in request.resource.data) &&
-             !('permissions' in request.resource.data);
+             !('permissions' in request.resource.data) &&
+             !('deletionStatus' in request.resource.data);
     }
 
-    // ─── Public Product Cache (Read-only for clients, writes by backend only) ──
+    // Validate user profile payload constraints
+    function isValidUserProfile() {
+      return notModifyingProtectedFields() &&
+             (!('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100)) &&
+             (!('email' in request.resource.data) || (request.resource.data.email is string && request.resource.data.email.size() <= 200));
+    }
+
+    // --- Public Product Cache (Read-only for clients, writes by backend only) ---
     match /artifacts/{appId}/public/data/{type}/{docId} {
       allow read: if true;
       allow write: if false; // Only Cloud Functions / Admin SDK can write
     }
 
-    // ─── User Profile and Private Data (Strict Least Privilege) ────────────────
+    // --- Internal Rate Limit & Audit Collections (Server Admin SDK Only) ---
+    match /artifacts/{appId}/system_rate_limits/{docId} {
+      allow read, write: if false; // Strictly server-only
+    }
+
+    match /artifacts/{appId}/system_audit_logs/{docId} {
+      allow read, write: if false; // Strictly server-only
+    }
+
+    // --- User Profile and Private Data (Strict Least Privilege) -------------
     match /artifacts/{appId}/users/{uid} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid) && notModifyingProtectedFields();
+      allow create, update: if isOwner(uid) && isValidUserProfile();
       allow delete: if isOwner(uid);
 
-      // Saved products sub-collection
+      // Saved products subcollection
       match /savedProducts/{productId} {
         allow read: if isOwner(uid);
         allow create, update: if isOwner(uid) && notModifyingProtectedFields();
         allow delete: if isOwner(uid);
       }
 
-      // Scan history sub-collection
+      // Scan history subcollection
       match /scans/{scanId} {
         allow read: if isOwner(uid);
         allow create, update: if isOwner(uid) && notModifyingProtectedFields();
         allow delete: if isOwner(uid);
       }
 
-      // User-scoped subcollections (e.g. exports, private preferences)
-      match /{userSubcollections=**} {
-        allow read, write: if isOwner(uid) && notModifyingProtectedFields();
+      // Settings and preferences subcollection
+      match /settings/{settingId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) && notModifyingProtectedFields();
+        allow delete: if isOwner(uid);
       }
     }
 
-    // ─── Deny All Other Access By Default ──────────────────────────────────────
+    // --- Deny All Other Access By Default -----------------------------------
     match /{document=**} {
       allow read, write: if false;
     }

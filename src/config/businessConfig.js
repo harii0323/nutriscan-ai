@@ -24,14 +24,14 @@ export const BUSINESS_CONFIG = {
   grievanceEmail: env.VITE_GRIEVANCE_EMAIL || 'privacy@nutriscan.ai',
 
   // Registered / Operational Location
-  jurisdiction: 'New Delhi / Bengaluru, India',
+  jurisdiction: env.VITE_BUSINESS_JURISDICTION || 'New Delhi / Bengaluru, India',
   address: env.VITE_BUSINESS_ADDRESS || 'NutriScan AI Operations, Karnataka, India',
-  
+
   // Version and Policy Metadata
   policyVersion: '1.2.0',
   effectiveDate: 'October 9, 2026',
   lastUpdated: 'October 9, 2026',
-  
+
   // Applicable Regulatory References
   regulations: {
     indiaDPDP: 'Digital Personal Data Protection Act, 2023 & DPDP Rules, 2025',
@@ -53,36 +53,53 @@ export function validateBusinessConfiguration(strict = false) {
     'Grievance Officer',
     'privacy@nutriscan.ai',
     'NutriScan AI Operations, Karnataka, India',
+    'New Delhi / Bengaluru, India',
   ];
 
-  if (placeholders.includes(BUSINESS_CONFIG.legalName)) {
+  if (!BUSINESS_CONFIG.legalName || placeholders.includes(BUSINESS_CONFIG.legalName)) {
     issues.push({
       field: 'legalName',
-      message: 'Legal entity name is set to placeholder. Configure VITE_BUSINESS_LEGAL_NAME for production release.',
+      message: 'Legal entity name is set to placeholder or empty. Configure VITE_BUSINESS_LEGAL_NAME for production release.',
     });
   }
-  if (placeholders.includes(BUSINESS_CONFIG.supportEmail)) {
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!BUSINESS_CONFIG.supportEmail || placeholders.includes(BUSINESS_CONFIG.supportEmail)) {
     issues.push({
       field: 'supportEmail',
-      message: 'Support email is set to default placeholder. Configure VITE_SUPPORT_EMAIL.',
+      message: 'Support email is set to default placeholder or empty. Configure VITE_SUPPORT_EMAIL.',
+    });
+  } else if (!emailRegex.test(BUSINESS_CONFIG.supportEmail)) {
+    issues.push({
+      field: 'supportEmail',
+      message: 'Support email format is invalid.',
     });
   }
-  if (placeholders.includes(BUSINESS_CONFIG.grievanceOfficerName)) {
+
+  if (!BUSINESS_CONFIG.grievanceOfficerName || placeholders.includes(BUSINESS_CONFIG.grievanceOfficerName)) {
     issues.push({
       field: 'grievanceOfficerName',
-      message: 'DPDP Grievance Officer is set to placeholder. Configure VITE_GRIEVANCE_OFFICER_NAME.',
+      message: 'DPDP Grievance Officer is set to placeholder or empty. Configure VITE_GRIEVANCE_OFFICER_NAME.',
     });
   }
-  if (placeholders.includes(BUSINESS_CONFIG.grievanceEmail)) {
+
+  if (!BUSINESS_CONFIG.grievanceEmail || placeholders.includes(BUSINESS_CONFIG.grievanceEmail)) {
     issues.push({
       field: 'grievanceEmail',
-      message: 'Grievance email is set to default placeholder. Configure VITE_GRIEVANCE_EMAIL.',
+      message: 'Grievance email is set to default placeholder or empty. Configure VITE_GRIEVANCE_EMAIL.',
+    });
+  } else if (!emailRegex.test(BUSINESS_CONFIG.grievanceEmail)) {
+    issues.push({
+      field: 'grievanceEmail',
+      message: 'Grievance email format is invalid.',
     });
   }
-  if (placeholders.includes(BUSINESS_CONFIG.address)) {
+
+  if (!BUSINESS_CONFIG.address || placeholders.includes(BUSINESS_CONFIG.address)) {
     issues.push({
       field: 'address',
-      message: 'Physical address is set to default placeholder. Configure VITE_BUSINESS_ADDRESS.',
+      message: 'Physical address is set to default placeholder or empty. Configure VITE_BUSINESS_ADDRESS.',
     });
   }
 

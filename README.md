@@ -74,7 +74,7 @@ npm install
 cp .env.example .env.local
 ```
 
-Edit `.env.local` and fill in your Firebase and Gemini credentials:
+Edit `.env.local` and fill in your Firebase credentials and backend gateway URL:
 
 ```env
 VITE_FIREBASE_API_KEY=your_firebase_api_key
@@ -84,8 +84,16 @@ VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
 VITE_FIREBASE_APP_ID=1:123:web:abc
 
-# DEV ONLY - For production, use Cloud Functions instead
-VITE_GEMINI_API_KEY=your_gemini_api_key
+# Backend Gateway URL (Cloud Functions / Express Proxy)
+VITE_BACKEND_URL=https://nutriscan-ai-xm4u.onrender.com/api
+VITE_APP_ID=nutriscan-ai
+
+# Verified Business Details for Production Release Gate
+VITE_BUSINESS_LEGAL_NAME=Your Legal Entity Name
+VITE_SUPPORT_EMAIL=support@yourdomain.com
+VITE_GRIEVANCE_OFFICER_NAME=Grievance Officer Name
+VITE_GRIEVANCE_EMAIL=privacy@yourdomain.com
+VITE_BUSINESS_ADDRESS=Your Registered Office Address
 ```
 
 ### 3. Run Dev Server
@@ -98,22 +106,25 @@ Open http://localhost:5173
 
 ---
 
-## 🔑 API Keys Setup
+## 🔑 API Keys & Secret Management
 
-### Firebase
+### Firebase Client Credentials
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Create a new project
 3. Enable: Authentication, Firestore, Functions, Hosting
-4. Copy config values to `.env.local`
+4. Copy client identifiers to `.env.local`
 5. Enable auth providers: Email/Password, Google, Phone
 
-### Gemini API Key
+### Gemini API Key (Server Secret Only)
 
 1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
-2. Create an API key
-3. For **development**: add to `.env.local` as `VITE_GEMINI_API_KEY`
-4. For **production**: store in Firebase Secret Manager and use Cloud Functions
+2. Generate an API key
+3. Store the key securely in Firebase / Google Cloud Secret Manager:
+   ```bash
+   firebase functions:secrets:set GEMINI_API_KEY
+   ```
+4. Never place `GEMINI_API_KEY` in frontend `.env` files or client-side bundles. All Gemini operations are proxied through authenticated backend Cloud Functions.
 
 ---
 

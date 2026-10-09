@@ -16,27 +16,51 @@ const APP_ID = 'nutriscan-ai';
 // ─── Express App & Middleware ─────────────────────────────────────────────────
 const app = express();
 
-const ALLOWED_ORIGINS = [
+// Trust reverse proxy (Google Cloud / Firebase Hosting) for accurate client IP
+app.set('trust proxy', 1);
+
+// Production Origin Allowlist (Explicit - No Wildcard Suffix Matching)
+const PRODUCTION_ORIGINS = [
   'https://nutriscan-ai-xm4u.onrender.com',
+  'https://studio-3997613211-3d795.web.app',
+  'https://studio-3997613211-3d795.firebaseapp.com',
+];
+
+const DEV_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:4173',
 ];
+
+const envAdditionalOrigins = (process.env.ADDITIONAL_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+const ALLOWED_ORIGIN_SET = new Set<string>([
+  ...PRODUCTION_ORIGINS,
+  ...envAdditionalOrigins,
+  ...(!isProduction ? DEV_ORIGINS : []),
+]);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        ALLOWED_ORIGINS.includes(origin) ||
-        origin.endsWith('.onrender.com') ||
-        origin.endsWith('.web.app') ||
-        origin.endsWith('.firebaseapp.com')
-      ) {
+      // Allow requests with no origin (e.g. mobile app, curl, server-to-server)
+      if (!origin) {
         callback(null, true);
-      } else {
-        callback(new Error('CORS request denied'));
+        return;
       }
+      if (ALLOWED_ORIGIN_SET.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS request denied: origin ${origin} is not in the verified allowlist.`));
     },
     credentials: true,
   })
@@ -44,20 +68,37 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 
-// Correlation ID & Request Tracking
+// Security Headers & Correlation ID Normalization
 app.use((req: Request, res: Response, next: NextFunction) => {
-  const correlationId = (req.headers['x-request-id'] as string) || randomUUID();
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  const incomingId = req.headers['x-request-id'];
+  const correlationId =
+    typeof incomingId === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(incomingId)
+      ? incomingId
+      : randomUUID();
+
   res.setHeader('x-request-id', correlationId);
   (req as any).correlationId = correlationId;
   next();
 });
 
 // ─── Authentication Middlewares ───────────────────────────────────────────────
+
+/**
+ * Enforces a verified Firebase ID token.
+ * Rejects missing, malformed, or expired credentials.
+ * Attaches the verified user token payload to req.user.
+ */
 export async function authenticateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({
-      error: 'Unauthorized: Missing or invalid authentication token',
+      error: 'Authentication required. Please sign in to access this service.',
       code: 'UNAUTHORIZED',
       correlationId: (req as any).correlationId,
     });
@@ -65,77 +106,158 @@ export async function authenticateUser(req: Request, res: Response, next: NextFu
   }
 
   const token = authHeader.split('Bearer ')[1].trim();
+  if (!token) {
+    res.status(401).json({
+      error: 'Authentication token is empty or malformed.',
+      code: 'MALFORMED_TOKEN',
+      correlationId: (req as any).correlationId,
+    });
+    return;
+  }
+
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     (req as any).user = decoded;
     next();
   } catch (err: any) {
+    const isExpired = err.code === 'auth/id-token-expired';
     res.status(401).json({
-      error: 'Unauthorized: Invalid or expired token',
-      code: 'INVALID_TOKEN',
+      error: isExpired
+        ? 'Authentication session expired. Please re-authenticate.'
+        : 'Invalid authentication credentials.',
+      code: isExpired ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN',
       correlationId: (req as any).correlationId,
     });
   }
 }
 
+/**
+ * Optional authentication middleware for public endpoints needing user attribution if available.
+ */
 export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split('Bearer ')[1].trim();
-    try {
-      const decoded = await admin.auth().verifyIdToken(token);
-      (req as any).user = decoded;
-    } catch {
-      // Proceed unauthenticated
+    if (token) {
+      try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        (req as any).user = decoded;
+      } catch {
+        // Continue as unauthenticated guest
+      }
     }
   }
   next();
 }
 
-// ─── Concurrency-Safe Rate Limiter ────────────────────────────────────────────
-interface RateLimitEntry {
+// ─── Distributed Concurrency-Safe Rate Limiter ────────────────────────────────
+interface LocalRateLimitEntry {
   count: number;
   resetAt: number;
 }
-const rateLimitMap = new Map<string, RateLimitEntry>();
+const localFallbackMap = new Map<string, LocalRateLimitEntry>();
 
-// Clean up stale rate limit entries periodically
-setInterval(() => {
+// Clean up stale local entries every 60 seconds
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of rateLimitMap.entries()) {
+  for (const [key, entry] of localFallbackMap.entries()) {
     if (entry.resetAt <= now) {
-      rateLimitMap.delete(key);
+      localFallbackMap.delete(key);
     }
   }
 }, 60000);
+if (cleanupInterval.unref) {
+  cleanupInterval.unref();
+}
 
-export function rateLimit(windowMs: number, maxRequests: number) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const key = (req as any).user?.uid ? `user:${(req as any).user.uid}` : `ip:${ip}`;
+/**
+ * Distributed rate limiter backed by Firestore transactions.
+ * Coordinates request quotas across horizontally scaled Cloud Function instances.
+ * Falls back to an in-memory sliding window if Firestore is temporarily slow or unavailable.
+ */
+export function rateLimit(windowMs: number, maxRequests: number, tier = 'default') {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const rawIp = req.ip || req.socket.remoteAddress || 'unknown';
+    const sanitizedIp = String(rawIp).replace(/[^a-zA-Z0-9.:_-]/g, '').slice(0, 45);
+    const userId = (req as any).user?.uid;
+    const identifier = userId ? `user_${userId}` : `ip_${sanitizedIp}`;
+    const safeKey = `${tier}_${identifier.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     const now = Date.now();
-    const entry = rateLimitMap.get(String(key));
 
-    if (!entry || entry.resetAt <= now) {
-      rateLimitMap.set(String(key), { count: 1, resetAt: now + windowMs });
-      next();
-      return;
-    }
+    try {
+      const limitRef = db.doc(`artifacts/${APP_ID}/system_rate_limits/${safeKey}`);
 
-    if (entry.count >= maxRequests) {
-      const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-      res.setHeader('Retry-After', String(retryAfter));
-      res.status(429).json({
-        error: 'Too many requests. Please slow down.',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter,
-        correlationId: (req as any).correlationId,
+      const txPromise = db.runTransaction(async (transaction) => {
+        const snap = await transaction.get(limitRef);
+        const data = snap.data();
+
+        if (!snap.exists || !data || (data.resetAt && data.resetAt <= now)) {
+          const resetAt = now + windowMs;
+          transaction.set(limitRef, {
+            count: 1,
+            resetAt,
+            tier,
+            identifier,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return { allowed: true, count: 1, resetAt };
+        }
+
+        if (data.count >= maxRequests) {
+          return { allowed: false, count: data.count, resetAt: data.resetAt };
+        }
+
+        const newCount = data.count + 1;
+        transaction.update(limitRef, {
+          count: newCount,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { allowed: true, count: newCount, resetAt: data.resetAt };
       });
-      return;
-    }
 
-    entry.count++;
-    next();
+      const timeoutPromise = new Promise<{ allowed: boolean; count: number; resetAt: number }>((_, reject) => {
+        setTimeout(() => reject(new Error('Firestore rate limit timeout')), 1500);
+      });
+
+      const result = await Promise.race([txPromise, timeoutPromise]);
+
+      if (!result.allowed) {
+        const retryAfter = Math.max(1, Math.ceil((result.resetAt - now) / 1000));
+        res.setHeader('Retry-After', String(retryAfter));
+        res.status(429).json({
+          error: 'Rate limit exceeded. Please wait before sending additional requests.',
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfter,
+          correlationId: (req as any).correlationId,
+        });
+        return;
+      }
+
+      next();
+    } catch (err: any) {
+      // Resilient local fallback if Firestore operation errors or is unavailable
+      const fallbackEntry = localFallbackMap.get(safeKey);
+      if (!fallbackEntry || fallbackEntry.resetAt <= now) {
+        localFallbackMap.set(safeKey, { count: 1, resetAt: now + windowMs });
+        next();
+        return;
+      }
+
+      if (fallbackEntry.count >= maxRequests) {
+        const retryAfter = Math.max(1, Math.ceil((fallbackEntry.resetAt - now) / 1000));
+        res.setHeader('Retry-After', String(retryAfter));
+        res.status(429).json({
+          error: 'Rate limit exceeded. Please wait before sending additional requests.',
+          code: 'RATE_LIMIT_EXCEEDED',
+          retryAfter,
+          correlationId: (req as any).correlationId,
+        });
+        return;
+      }
+
+      fallbackEntry.count++;
+      next();
+    }
   };
 }
 
@@ -269,31 +391,47 @@ async function healthProductSearch(query: string) {
 
 // ─── Firestore Cache Helpers ──────────────────────────────────────────────────
 async function getCached(type: string, key: string) {
-  const doc = await db.doc(`artifacts/${APP_ID}/public/data/${type}/${encodeURIComponent(key)}`).get();
-  return doc.exists ? doc.data() : null;
+  try {
+    const doc = await db.doc(`artifacts/${APP_ID}/public/data/${type}/${encodeURIComponent(key)}`).get();
+    return doc.exists ? doc.data() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function setCache(type: string, key: string, data: object) {
-  await db
-    .doc(`artifacts/${APP_ID}/public/data/${type}/${encodeURIComponent(key)}`)
-    .set({ ...data, cachedAt: admin.firestore.FieldValue.serverTimestamp() });
+  try {
+    await db
+      .doc(`artifacts/${APP_ID}/public/data/${type}/${encodeURIComponent(key)}`)
+      .set({ ...data, cachedAt: admin.firestore.FieldValue.serverTimestamp() });
+  } catch {
+    // Non-fatal cache write failure
+  }
 }
 
 // ─── Endpoints ────────────────────────────────────────────────────────────────
 
-// Health Check
+// Health Check Endpoint
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'NutriScan AI Protected Backend' });
+  res.json({
+    status: 'ok',
+    service: 'NutriScan AI Protected Backend',
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// GET /getProductData
-app.get('/getProductData', rateLimit(60000, 40), async (req: Request, res: Response) => {
+// GET /getProductData - Public product lookup with IP rate limiting
+app.get('/getProductData', rateLimit(600000, 40, 'public_lookup'), async (req: Request, res: Response) => {
   const query = typeof req.query.query === 'string' ? req.query.query.trim().slice(0, 200) : '';
   const type = ['foods', 'care', 'health'].includes(String(req.query.type)) ? String(req.query.type) : 'foods';
   const barcode = typeof req.query.barcode === 'string' ? req.query.barcode.trim().slice(0, 32) : '';
 
   if (!query && !barcode) {
-    res.status(400).json({ error: 'query or barcode required', code: 'INVALID_QUERY' });
+    res.status(400).json({
+      error: 'Product query string or barcode required.',
+      code: 'INVALID_QUERY',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
@@ -319,25 +457,48 @@ app.get('/getProductData', rateLimit(60000, 40), async (req: Request, res: Respo
     await setCache(type, cacheKey, rawData);
     res.json(rawData);
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Data lookup failed', code: 'LOOKUP_FAILED' });
+    res.status(500).json({
+      error: 'Product lookup failed. Please try again.',
+      code: 'LOOKUP_FAILED',
+      correlationId: (req as any).correlationId,
+    });
   }
 });
 
-// POST /analyzeProduct – Gemini product analysis
-app.post('/analyzeProduct', optionalAuth, rateLimit(60000, 20), async (req: Request, res: Response) => {
+// POST /analyzeProduct - Authenticated Gemini product analysis
+app.post('/analyzeProduct', authenticateUser, rateLimit(600000, 20, 'ai_product'), async (req: Request, res: Response) => {
   const { query, type = 'foods', imageBase64 } = req.body;
 
   if (typeof query !== 'string' && !imageBase64) {
-    res.status(400).json({ error: 'query string or imageBase64 required', code: 'INVALID_INPUT' });
+    res.status(400).json({
+      error: 'Product query string or imageBase64 required.',
+      code: 'INVALID_INPUT',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
   const cleanQuery = typeof query === 'string' ? query.trim().slice(0, 200) : '';
   const cleanType = ['foods', 'care', 'health'].includes(type) ? type : 'foods';
 
-  if (imageBase64 && (typeof imageBase64 !== 'string' || imageBase64.length > 7000000)) {
-    res.status(400).json({ error: 'Image size exceeds maximum allowed size (5MB)', code: 'IMAGE_TOO_LARGE' });
-    return;
+  if (imageBase64) {
+    if (typeof imageBase64 !== 'string') {
+      res.status(400).json({
+        error: 'Image data must be a base64 encoded string.',
+        code: 'INVALID_IMAGE_FORMAT',
+        correlationId: (req as any).correlationId,
+      });
+      return;
+    }
+    // Reject images exceeding 5MB (~7,000,000 base64 chars)
+    if (imageBase64.length > 7000000) {
+      res.status(400).json({
+        error: 'Image size exceeds maximum allowed limit (5MB).',
+        code: 'IMAGE_TOO_LARGE',
+        correlationId: (req as any).correlationId,
+      });
+      return;
+    }
   }
 
   const cacheKey = cleanQuery || 'image-scan';
@@ -394,9 +555,26 @@ type must be strictly "Natural" or "Artificial".`,
     const result = extractJSON(text);
 
     if (!result || typeof result !== 'object') {
-      res.status(502).json({ error: 'AI provider returned invalid response structure', code: 'AI_INVALID_JSON' });
+      res.status(502).json({
+        error: 'AI service produced an unparseable response structure.',
+        code: 'AI_INVALID_JSON',
+        correlationId: (req as any).correlationId,
+      });
       return;
     }
+
+    // Runtime schema validation
+    const validGrades = ['A', 'B', 'C', 'D', 'F'];
+    if (!validGrades.includes(result.healthGrade)) {
+      result.healthGrade = 'C';
+    }
+    if (!Array.isArray(result.ingredients)) {
+      result.ingredients = [];
+    }
+    if (!Array.isArray(result.alternatives)) {
+      result.alternatives = [];
+    }
+    result.disclaimer = 'NutriScan AI provides nutritional analysis for educational purposes. It is not medical or diagnostic advice.';
 
     if (cleanQuery && !imageBase64) {
       await setCache(cleanType, cacheKey, result);
@@ -412,12 +590,16 @@ type must be strictly "Natural" or "Artificial".`,
   }
 });
 
-// POST /analyzeNutrition – Gemini nutrition analysis
-app.post('/analyzeNutrition', optionalAuth, rateLimit(60000, 20), async (req: Request, res: Response) => {
+// POST /analyzeNutrition - Authenticated Gemini nutrition analysis
+app.post('/analyzeNutrition', authenticateUser, rateLimit(600000, 20, 'ai_nutrition'), async (req: Request, res: Response) => {
   const { foodName, serving, isPlate } = req.body;
 
   if (typeof foodName !== 'string' || !foodName.trim()) {
-    res.status(400).json({ error: 'foodName string required', code: 'INVALID_FOOD_NAME' });
+    res.status(400).json({
+      error: 'Valid foodName string required.',
+      code: 'INVALID_FOOD_NAME',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
@@ -433,10 +615,15 @@ app.post('/analyzeNutrition', optionalAuth, rateLimit(60000, 20), async (req: Re
     const result = extractJSON(text);
 
     if (!result || typeof result !== 'object') {
-      res.status(502).json({ error: 'AI returned invalid nutrition response', code: 'AI_INVALID_JSON' });
+      res.status(502).json({
+        error: 'AI service returned invalid nutrition response.',
+        code: 'AI_INVALID_JSON',
+        correlationId: (req as any).correlationId,
+      });
       return;
     }
 
+    result.disclaimer = 'Nutritional values are AI estimates based on standard databases and may vary by preparation.';
     res.json(result);
   } catch (err: any) {
     res.status(500).json({
@@ -447,18 +634,22 @@ app.post('/analyzeNutrition', optionalAuth, rateLimit(60000, 20), async (req: Re
   }
 });
 
-// POST /aiInsight – Gemini insight generation
-app.post('/aiInsight', optionalAuth, rateLimit(60000, 25), async (req: Request, res: Response) => {
+// POST /aiInsight - Authenticated Gemini insight generation
+app.post('/aiInsight', authenticateUser, rateLimit(600000, 25, 'ai_insight'), async (req: Request, res: Response) => {
   const { foodName, insightType, nutrition } = req.body;
 
   if (typeof foodName !== 'string' || !['coach', 'improve', 'recipe'].includes(insightType)) {
-    res.status(400).json({ error: 'Valid foodName and insightType (coach|improve|recipe) required', code: 'INVALID_INPUT' });
+    res.status(400).json({
+      error: 'Valid foodName and insightType (coach|improve|recipe) required.',
+      code: 'INVALID_INPUT',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
   const cleanFood = foodName.trim().slice(0, 200);
   const prompts: Record<string, string> = {
-    coach: `As an AI Health Coach, give personalized advice (3-4 concise, encouraging sentences) about eating "${cleanFood}" with nutrition: ${JSON.stringify(nutrition || {})}. Be practical.`,
+    coach: `As an AI Health Coach, give personalized advice (3-4 concise, encouraging sentences) about eating "${cleanFood}" with nutrition: ${JSON.stringify(nutrition || {})}. Be practical and factual.`,
     improve: `Suggest 3 realistic healthy improvements or tweaks for a meal containing "${cleanFood}". Keep it punchy and actionable.`,
     recipe: `Give a simple, nutritious recipe idea featuring "${cleanFood}" as the main ingredient. Include brief steps.`,
   };
@@ -468,7 +659,7 @@ app.post('/aiInsight', optionalAuth, rateLimit(60000, 25), async (req: Request, 
     res.json({ insight: text });
   } catch (err: any) {
     res.status(500).json({
-      error: 'Failed to generate nutritional insight',
+      error: 'Failed to generate nutritional insight. Please try again.',
       code: 'INSIGHT_FAILED',
       correlationId: (req as any).correlationId,
     });
@@ -479,11 +670,19 @@ app.post('/aiInsight', optionalAuth, rateLimit(60000, 25), async (req: Request, 
 async function handleFoodIdentification(req: Request, res: Response): Promise<void> {
   const { imageBase64 } = req.body;
   if (!imageBase64 || typeof imageBase64 !== 'string') {
-    res.status(400).json({ error: 'imageBase64 string required', code: 'INVALID_IMAGE' });
+    res.status(400).json({
+      error: 'imageBase64 string required.',
+      code: 'INVALID_IMAGE',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
   if (imageBase64.length > 7000000) {
-    res.status(400).json({ error: 'Image size exceeds maximum allowed size (5MB)', code: 'IMAGE_TOO_LARGE' });
+    res.status(400).json({
+      error: 'Image size exceeds maximum allowed limit (5MB).',
+      code: 'IMAGE_TOO_LARGE',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
@@ -498,50 +697,71 @@ async function handleFoodIdentification(req: Request, res: Response): Promise<vo
     res.json(Array.isArray(items) ? items : [items || 'Healthy Meal Plate']);
   } catch (err: any) {
     res.status(500).json({
-      error: 'Food identification failed',
+      error: 'Food identification failed. Please try again.',
       code: 'IDENTIFICATION_FAILED',
       correlationId: (req as any).correlationId,
     });
   }
 }
 
-// Support both endpoint names for compatibility
-app.post('/identifyFood', optionalAuth, rateLimit(60000, 20), handleFoodIdentification);
-app.post('/identifyFoodItems', optionalAuth, rateLimit(60000, 20), handleFoodIdentification);
+// Support both endpoint names for compatibility (both require authenticated session)
+app.post('/identifyFood', authenticateUser, rateLimit(600000, 10, 'ai_vision'), handleFoodIdentification);
+app.post('/identifyFoodItems', authenticateUser, rateLimit(600000, 10, 'ai_vision'), handleFoodIdentification);
 
-// POST /chat – AI nutritional chatbot
-app.post('/chat', optionalAuth, rateLimit(60000, 25), async (req: Request, res: Response) => {
+// POST /chat - Authenticated AI nutritional chatbot
+app.post('/chat', authenticateUser, rateLimit(600000, 30, 'ai_chat'), async (req: Request, res: Response) => {
   const { messages } = req.body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    res.status(400).json({ error: 'messages array required', code: 'INVALID_MESSAGES' });
+    res.status(400).json({
+      error: 'messages array required.',
+      code: 'INVALID_MESSAGES',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
   if (messages.length > 30) {
-    res.status(400).json({ error: 'Exceeded maximum message history (30 messages)', code: 'PAYLOAD_TOO_LARGE' });
+    res.status(400).json({
+      error: 'Exceeded maximum message history (30 messages).',
+      code: 'PAYLOAD_TOO_LARGE',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
   for (const m of messages) {
     if (!m || typeof m !== 'object' || typeof m.content !== 'string' || !['user', 'assistant'].includes(m.role)) {
-      res.status(400).json({ error: 'Each message must have valid role and content', code: 'INVALID_MESSAGE_FORMAT' });
+      res.status(400).json({
+        error: 'Each message must have valid role and content.',
+        code: 'INVALID_MESSAGE_FORMAT',
+        correlationId: (req as any).correlationId,
+      });
       return;
     }
     if (m.content.length > 2000) {
-      res.status(400).json({ error: 'Message content exceeds maximum allowed length (2000)', code: 'CONTENT_TOO_LONG' });
+      res.status(400).json({
+        error: 'Message content exceeds maximum allowed length (2000 characters).',
+        code: 'CONTENT_TOO_LONG',
+        correlationId: (req as any).correlationId,
+      });
       return;
     }
   }
 
   const lastMsg = messages[messages.length - 1];
   if (lastMsg.role !== 'user' || !lastMsg.content.trim()) {
-    res.status(400).json({ error: 'Last message must be a non-empty user message', code: 'INVALID_LAST_MESSAGE' });
+    res.status(400).json({
+      error: 'Last message must be a non-empty user message.',
+      code: 'INVALID_LAST_MESSAGE',
+      correlationId: (req as any).correlationId,
+    });
     return;
   }
 
   const SYSTEM_CONTEXT = `You are NutriScan Assistant, an AI expert in nutrition, food science, cosmetic ingredient safety, and wellness.
 You help users understand food labels, additives, cosmetic toxicity, macros, and healthy lifestyle choices.
-You are friendly, concise, and evidence-based. Format your responses with clear markdown bullets where helpful.`;
+You are friendly, concise, and evidence-based. Format your responses with clear markdown bullets where helpful.
+Disclaimer: State clearly that your answers provide educational nutritional guidance and not medical diagnosis or treatment advice.`;
 
   const prior = messages.slice(0, messages.length - 1);
   const contents: any[] = [];
@@ -576,34 +796,59 @@ You are friendly, concise, and evidence-based. Format your responses with clear 
   }
 });
 
-// ─── Account Deletion (Transactional & Complete) ──────────────────────────────
+// ─── Account Deletion (Transactional, Resumable & Authoritative) ───────────────
+
+/**
+ * Authoritative server-side deletion of user data and authentication record.
+ * Handles subcollections in bounded batches of 400 to prevent timeout or Firestore limits.
+ * Idempotent: safe to run multiple times.
+ */
 export async function deleteUserAccountData(uid: string): Promise<void> {
-  // 1. Delete savedProducts subcollection in batched writes
-  const savedRef = db.collection(`artifacts/${APP_ID}/users/${uid}/savedProducts`);
-  const savedDocs = await savedRef.get();
-  if (!savedDocs.empty) {
-    const batch1 = db.batch();
-    for (const d of savedDocs.docs) {
-      batch1.delete(d.ref);
-    }
-    await batch1.commit();
+  if (!uid || typeof uid !== 'string') {
+    throw new Error('Valid user UID required for account deletion');
   }
 
-  // 2. Delete scans subcollection in batched writes
-  const scansRef = db.collection(`artifacts/${APP_ID}/users/${uid}/scans`);
-  const scansDocs = await scansRef.get();
-  if (!scansDocs.empty) {
-    const batch2 = db.batch();
-    for (const d of scansDocs.docs) {
-      batch2.delete(d.ref);
+  const userDocRef = db.doc(`artifacts/${APP_ID}/users/${uid}`);
+
+  // Prevent concurrent deletion races by setting deletion in-progress lock
+  await userDocRef.set(
+    {
+      deletionStatus: 'in_progress',
+      deletionStartedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  // Helper: Bounded batch deletion for subcollections (up to 400 items per batch)
+  async function deleteCollectionBounded(collectionRef: admin.firestore.CollectionReference) {
+    const BATCH_SIZE = 400;
+    while (true) {
+      const snapshot = await collectionRef.limit(BATCH_SIZE).get();
+      if (snapshot.empty) break;
+
+      const batch = db.batch();
+      for (const doc of snapshot.docs) {
+        batch.delete(doc.ref);
+      }
+      await batch.commit();
+
+      if (snapshot.size < BATCH_SIZE) break;
     }
-    await batch2.commit();
   }
 
-  // 3. Delete root user document
-  await db.doc(`artifacts/${APP_ID}/users/${uid}`).delete();
+  // 1. Delete savedProducts subcollection
+  await deleteCollectionBounded(db.collection(`artifacts/${APP_ID}/users/${uid}/savedProducts`));
 
-  // 4. Delete Firebase Auth user account
+  // 2. Delete scans subcollection
+  await deleteCollectionBounded(db.collection(`artifacts/${APP_ID}/users/${uid}/scans`));
+
+  // 3. Delete settings / preferences subcollection if present
+  await deleteCollectionBounded(db.collection(`artifacts/${APP_ID}/users/${uid}/settings`));
+
+  // 4. Delete root user document
+  await userDocRef.delete();
+
+  // 5. Delete Firebase Authentication user record
   try {
     await admin.auth().deleteUser(uid);
   } catch (err: any) {
@@ -613,28 +858,31 @@ export async function deleteUserAccountData(uid: string): Promise<void> {
   }
 }
 
-// POST /deleteAccount – Authorized complete deletion
+// POST /deleteAccount - Authorized complete account deletion endpoint
 app.post('/deleteAccount', authenticateUser, async (req: Request, res: Response) => {
   const uid = (req as any).user.uid;
   try {
     await deleteUserAccountData(uid);
-    res.json({ success: true, message: 'Account and associated personal records deleted successfully.' });
+    res.json({
+      success: true,
+      message: 'Account and associated personal records deleted successfully.',
+    });
   } catch (err: any) {
     res.status(500).json({
-      error: 'Account erasure failed. Please try again or contact support.',
+      error: 'Account erasure failed. Please try again or contact customer support.',
       code: 'DELETION_FAILED',
       correlationId: (req as any).correlationId,
     });
   }
 });
 
-// ─── Exports ──────────────────────────────────────────────────────────────────
+// ─── Firebase Cloud Function Exports ──────────────────────────────────────────
 export const api = onRequest(
   { timeoutSeconds: 60, memory: '512MiB', secrets: ['GEMINI_API_KEY'] },
   app
 );
 
-// Callable Function for Client SDK
+// Callable Function for Client SDK: Product Lookup
 export const getProductData = onCall(async (request) => {
   const { query, type, barcode } = request.data || {};
   if (!query && !barcode) throw new HttpsError('invalid-argument', 'query or barcode required');
@@ -658,7 +906,7 @@ export const getProductData = onCall(async (request) => {
   }
 });
 
-// Callable Function for Account Deletion
+// Callable Function for Client SDK: Account Deletion
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to delete account');
@@ -671,3 +919,6 @@ export const deleteAccount = onCall(async (request) => {
     throw new HttpsError('internal', err.message || 'Account deletion failed');
   }
 });
+
+export { app };
+

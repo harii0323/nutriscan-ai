@@ -1,4 +1,4 @@
-// Gemini AI Client Service – Protected Backend API Gateway
+// Gemini AI Client Service - Protected Backend API Gateway
 // Client secrets and direct SDK execution removed in compliance with production security standards.
 // All requests are proxied through authenticated Cloud Functions / backend endpoints.
 
@@ -19,9 +19,29 @@ async function getAuthHeaders() {
       headers.Authorization = `Bearer ${token}`;
     }
   } catch {
-    // If auth state is inaccessible, proceed unauthenticated
+    // If auth state is inaccessible, proceed without header
   }
   return headers;
+}
+
+/**
+ * Handle API error response with friendly user messages for standard HTTP codes
+ */
+async function parseErrorResponse(res, fallbackMessage) {
+  const errData = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    return new Error(errData.error || 'Authentication required. Please sign in to access AI analysis.');
+  }
+  if (res.status === 403) {
+    return new Error(errData.error || 'Access to this resource is forbidden.');
+  }
+  if (res.status === 429) {
+    return new Error(errData.error || 'Rate limit reached. Please wait a moment before trying again.');
+  }
+  if (res.status >= 500) {
+    return new Error(errData.error || 'AI service is temporarily unavailable. Please try again in a few moments.');
+  }
+  return new Error(errData.error || fallbackMessage || `Request failed with status ${res.status}`);
 }
 
 /**
@@ -66,8 +86,7 @@ export async function analyzeProductAI({ query, type = 'foods', imageBase64 = nu
   });
 
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Product analysis failed with status ${res.status}`);
+    throw await parseErrorResponse(res, 'Product analysis failed.');
   }
 
   return await res.json();
@@ -98,8 +117,7 @@ export async function identifyFoodItemsAI(imageBase64) {
       return Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : ['Healthy Meal Plate']);
     }
 
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Food item identification failed with status ${res.status}`);
+    throw await parseErrorResponse(res, 'Food item identification failed.');
   }
 
   const data = await res.json();
@@ -121,8 +139,7 @@ export async function analyzeFoodNutritionAI(foodName, serving = '100 grams', is
   });
 
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Nutrition analysis failed with status ${res.status}`);
+    throw await parseErrorResponse(res, 'Nutrition analysis failed.');
   }
 
   return await res.json();
@@ -141,8 +158,7 @@ export async function getAIInsightAI(foodName, insightType, nutrition) {
   });
 
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `AI insight generation failed with status ${res.status}`);
+    throw await parseErrorResponse(res, 'AI insight generation failed.');
   }
 
   const data = await res.json();
@@ -162,8 +178,7 @@ export async function sendChatMessageAI(messages) {
   });
 
   if (!res.ok) {
-    const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error || `Chat assistant failed with status ${res.status}`);
+    throw await parseErrorResponse(res, 'Chat assistant failed.');
   }
 
   const data = await res.json();
