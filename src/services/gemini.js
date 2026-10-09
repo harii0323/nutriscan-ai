@@ -1,57 +1,31 @@
-// Gemini AI Service – client-side Gemini 2.5 Flash integration with fallback
-import { GoogleGenerativeAI } from '@google/generative-ai';
+// Gemini AI Client Service – Protected Backend API Gateway
+// Client secrets and direct SDK execution removed in compliance with production security standards.
+// All requests are proxied through authenticated Cloud Functions / backend endpoints.
 
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-const CANDIDATE_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-latest',
-  'gemini-2.5-flash',
-];
+import { auth } from '../firebaseConfig.js';
 
-let genAIInstance = null;
-function getGenAI() {
-  if (!GEMINI_KEY) {
-    throw new Error('Missing Gemini API key. Set VITE_GEMINI_API_KEY in your .env.local file.');
-  }
-  if (!genAIInstance) {
-    genAIInstance = new GoogleGenerativeAI(GEMINI_KEY);
-  }
-  return genAIInstance;
-}
+// Resolve backend URL from environment or default to relative '/api'
+const RAW_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+const BACKEND_URL = RAW_BACKEND_URL.replace(/\/$/, '') || '/api';
 
 /**
- * Call Gemini with automatic model pool fallback and transient error retry
+ * Retrieve authorization headers with Firebase ID token if user is signed in
  */
-export async function callGemini(contents, systemInstruction = '') {
-  const genAI = getGenAI();
-
-  let lastError = null;
-  for (const modelName of CANDIDATE_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction: systemInstruction || undefined,
-      });
-      const result = await model.generateContent(contents);
-      const response = await result.response;
-      return response.text();
-    } catch (err) {
-      console.warn(`[Gemini] Model ${modelName} error:`, err?.message || err);
-      lastError = err;
-      // If server busy/spiking (503/429), back off briefly before next candidate
-      const isTransient = /503|429|demand|unavailable|overloaded/i.test(err?.message || '');
-      if (isTransient) {
-        await new Promise(r => setTimeout(r, 900));
-      }
+async function getAuthHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  try {
+    const token = await auth?.currentUser?.getIdToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
+  } catch {
+    // If auth state is inaccessible, proceed unauthenticated
   }
-
-  throw new Error(`Gemini request failed: ${lastError?.message || 'Unknown error'}`);
+  return headers;
 }
 
 /**
- * Helper to extract and parse JSON from Gemini text response
+ * Robust JSON extraction helper from AI string output
  */
 export function extractJSON(text, fallback = null) {
   if (!text) return fallback;
@@ -81,226 +55,117 @@ export function extractJSON(text, fallback = null) {
 
 /**
  * Analyze a product (food, cosmetic/personal care, or health supplement)
+ * Proxies request to backend endpoint /analyzeProduct
  */
 export async function analyzeProductAI({ query, type = 'foods', imageBase64 = null }) {
-  const parts = [];
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/analyzeProduct`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ query, type, imageBase64 }),
+  });
 
-  if (imageBase64) {
-    parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: imageBase64,
-      },
-    });
-    parts.push({
-      text: `Identify the exact product shown in this image. Then analyze it as a ${type} product.
-Return ONLY valid JSON in this exact structure with no extra commentary:
-{
-  "name": "Exact Brand and Product Name",
-  "healthGrade": "A",
-  "summary": "Clear, concise 2-3 sentence summary evaluating safety, nutritional/ingredient quality, and key takeaways.",
-  "ingredients": [
-    {
-      "name": "Ingredient Name",
-      "type": "Natural",
-      "risk": "Brief health implication or benefits/concerns",
-      "classification": "safe"
-    }
-  ],
-  "alternatives": [
-    {
-      "name": "Healthier Alternative Name",
-      "reason": "Why this is a better or cleaner choice"
-    }
-  ]
-}
-Note: healthGrade must be strictly one of: "A", "B", "C", "D", or "F".
-classification must be strictly one of: "safe", "limited", or "harmful".
-type must be strictly "Natural" or "Artificial".`,
-    });
-  } else {
-    parts.push({
-      text: `Analyze the ${type} product "${query}".
-Return ONLY valid JSON in this exact structure with no extra commentary:
-{
-  "name": "${query}",
-  "healthGrade": "A",
-  "summary": "Clear, concise 2-3 sentence summary evaluating safety, nutritional/ingredient quality, and key takeaways.",
-  "ingredients": [
-    {
-      "name": "Ingredient Name",
-      "type": "Natural",
-      "risk": "Brief health implication or benefits/concerns",
-      "classification": "safe"
-    }
-  ],
-  "alternatives": [
-    {
-      "name": "Healthier Alternative Name",
-      "reason": "Why this is a better or cleaner choice"
-    }
-  ]
-}
-Note: healthGrade must be strictly one of: "A", "B", "C", "D", or "F".
-classification must be strictly one of: "safe", "limited", or "harmful".
-type must be strictly "Natural" or "Artificial".`,
-    });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Product analysis failed with status ${res.status}`);
   }
 
-  const rawText = await callGemini(parts);
-  const parsed = extractJSON(rawText);
-  return parsed;
+  return await res.json();
 }
 
 /**
  * Identify food items on a plate or image (multi-item detection)
+ * Proxies request to backend endpoint /identifyFoodItems (or /identifyFood)
  */
 export async function identifyFoodItemsAI(imageBase64) {
-  const parts = [
-    {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: imageBase64,
-      },
-    },
-    {
-      text: `You are an expert culinary and nutrition specialist with deep knowledge of global and Indian cuisines.
-Identify all distinct food items present on this plate or in this image.
-Return ONLY a valid JSON array of strings, for example: ["Masala Dosa", "Sambar", "Coconut Chutney"].
-No markdown, no explanation, only the JSON array.`,
-    },
-  ];
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/identifyFoodItems`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ imageBase64 }),
+  });
 
-  const rawText = await callGemini(parts);
-  const items = extractJSON(rawText, ['Healthy Meal Plate']);
-  return Array.isArray(items) ? items : [items];
+  if (!res.ok) {
+    // Fallback to /identifyFood if alternate route
+    const fallbackRes = await fetch(`${BACKEND_URL}/identifyFood`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ imageBase64 }),
+    }).catch(() => null);
+
+    if (fallbackRes && fallbackRes.ok) {
+      const data = await fallbackRes.json();
+      return Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : ['Healthy Meal Plate']);
+    }
+
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Food item identification failed with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [data?.items || 'Healthy Meal Plate'];
 }
 
 /**
  * Analyze nutrition for a specific food item or full plate
+ * Proxies request to backend endpoint /analyzeNutrition
  */
 export async function analyzeFoodNutritionAI(foodName, serving = '100 grams', isPlate = false) {
-  const prompt = isPlate
-    ? `Analyze the complete meal plate containing: "${foodName}".
-Return ONLY valid JSON in this exact structure:
-{
-  "name": "Full Plate Analysis: ${foodName}",
-  "healthGrade": "B",
-  "summary": "Balanced meal overview highlighting macronutrient distribution and satiety.",
-  "ingredients": [
-    { "name": "Main Item", "type": "Natural", "risk": "Provides sustained carbohydrates and micronutrients", "classification": "safe" }
-  ],
-  "nutrition": {
-    "serving": "${serving}",
-    "calories": 480,
-    "protein": 14,
-    "carbs": 68,
-    "fat": 16,
-    "sodium": "650mg"
-  },
-  "alternatives": [
-    { "name": "Lighter variation", "reason": "Reduces oil and increases vegetable fiber" }
-  ]
-}`
-    : `Analyze nutritional profile for "${foodName}" for a portion of ${serving}.
-Return ONLY valid JSON in this exact structure:
-{
-  "name": "${foodName}",
-  "healthGrade": "A",
-  "summary": "Nutritional summary evaluating calorie density, macronutrients, and health benefits.",
-  "ingredients": [
-    { "name": "Key component", "type": "Natural", "risk": "Nutrient-dense source", "classification": "safe" }
-  ],
-  "nutrition": {
-    "serving": "${serving}",
-    "calories": 210,
-    "protein": 7,
-    "carbs": 28,
-    "fat": 8,
-    "sodium": "320mg"
-  },
-  "alternatives": [
-    { "name": "Healthier alternative", "reason": "Higher protein or lower glycemic index" }
-  ]
-}`;
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/analyzeNutrition`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ foodName, serving, isPlate }),
+  });
 
-  const rawText = await callGemini([{ text: prompt }]);
-  return extractJSON(rawText);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Nutrition analysis failed with status ${res.status}`);
+  }
+
+  return await res.json();
 }
 
 /**
  * Generate AI Insight for meals (Coach advice, Improvements, Recipe ideas)
+ * Proxies request to backend endpoint /aiInsight
  */
 export async function getAIInsightAI(foodName, insightType, nutrition) {
-  const prompts = {
-    coach: `As an empathetic AI Health Coach, give personalized advice (3-4 concise, uplifting sentences) about having "${foodName}" with this nutritional profile: ${JSON.stringify(nutrition)}. Offer practical eating tips.`,
-    improve: `Suggest 3 realistic, healthy improvements or tweaks for a meal featuring "${foodName}". Keep each suggestion 1-2 punchy sentences.`,
-    recipe: `Provide a quick, nutritious recipe or serving idea centered around "${foodName}". Include 3-4 bullet steps and healthy swaps.`,
-  };
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/aiInsight`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ foodName, insightType, nutrition }),
+  });
 
-  const prompt = prompts[insightType] || prompts.coach;
-  return await callGemini([{ text: prompt }]);
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `AI insight generation failed with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.insight || data.message || String(data);
 }
 
 /**
  * Chat with NutriScan Assistant
+ * Proxies request to backend endpoint /chat
  */
 export async function sendChatMessageAI(messages) {
-  const SYSTEM_CONTEXT = `You are NutriScan Assistant, an AI expert in nutrition, food science, cosmetic ingredient safety, and wellness.
-You help users understand food labels, additives, cosmetic toxicity, macros, and healthy lifestyle choices.
-You are friendly, concise, and evidence-based. Format your responses with clear markdown bullets where helpful.`;
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${BACKEND_URL}/chat`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ messages }),
+  });
 
-  const genAI = getGenAI();
-
-  // The last message is the current user message
-  const lastMsg = messages[messages.length - 1];
-  const lastText = (lastMsg?.content || '').trim();
-  if (!lastText) return '';
-
-  // Prepare prior history (strictly must start with 'user' and alternate)
-  const priorMessages = messages.slice(0, messages.length - 1);
-  const history = [];
-
-  let firstUserFound = false;
-  for (const msg of priorMessages) {
-    const isUser = msg.role === 'user';
-    if (!firstUserFound) {
-      if (isUser) {
-        firstUserFound = true;
-        history.push({ role: 'user', parts: [{ text: msg.content }] });
-      }
-      continue;
-    }
-
-    const currentRole = isUser ? 'user' : 'model';
-    const lastRoleInHistory = history[history.length - 1]?.role;
-
-    if (currentRole !== lastRoleInHistory) {
-      history.push({ role: currentRole, parts: [{ text: msg.content }] });
-    }
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || `Chat assistant failed with status ${res.status}`);
   }
 
-  let lastError = null;
-  for (const modelName of CANDIDATE_MODELS) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction: SYSTEM_CONTEXT,
-      });
-
-      const chat = model.startChat({ history });
-      const result = await chat.sendMessage(lastText);
-      const response = await result.response;
-      return response.text();
-    } catch (err) {
-      console.warn(`[Gemini Chat] Model ${modelName} error:`, err?.message || err);
-      lastError = err;
-      const isTransient = /503|429|demand|unavailable|overloaded/i.test(err?.message || '');
-      if (isTransient) {
-        await new Promise(r => setTimeout(r, 900));
-      }
-    }
-  }
-
-  throw new Error(`Chat request failed: ${lastError?.message || 'Unknown error'}`);
+  const data = await res.json();
+  return data.message || data.reply || '';
 }

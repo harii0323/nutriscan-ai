@@ -14,33 +14,11 @@ import {
 import { db, APP_ID } from '../firebaseConfig.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-
 async function identifyFoodItems(imageBase64) {
-  if (BACKEND_URL) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/identifyFoodItems`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64 }),
-      });
-      if (res.ok) return await res.json();
-    } catch { /* fall through */ }
-  }
   return await identifyFoodItemsAI(imageBase64);
 }
 
 async function analyzeFoodNutrition(foodName, serving = '100 grams', isPlate = false) {
-  if (BACKEND_URL) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/analyzeNutrition`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foodName, serving, isPlate }),
-      });
-      if (res.ok) return await res.json();
-    } catch { /* fall through */ }
-  }
   return await analyzeFoodNutritionAI(foodName, serving, isPlate);
 }
 
@@ -50,19 +28,6 @@ async function recalculateServing(foodName, amount, unit) {
 }
 
 async function getAIInsight(foodName, insightType, nutrition) {
-  if (BACKEND_URL) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/aiInsight`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foodName, insightType, nutrition }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return data.insight || data;
-      }
-    } catch { /* fall through */ }
-  }
   return await getAIInsightAI(foodName, insightType, nutrition);
 }
 

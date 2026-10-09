@@ -12,10 +12,12 @@
     "test:e2e": "vitest run src/__tests__/e2e-api.test.js",
     "test:perf": "node scripts/performance-test.mjs",
     "test:watch": "vitest",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "validate:config": "node scripts/validate-business-config.mjs",
+    "build:functions": "npm --prefix functions run build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@tailwindcss/vite": "^4.3.3",
     "axios": "^1.20.0",
     "firebase": "^12.19.0",

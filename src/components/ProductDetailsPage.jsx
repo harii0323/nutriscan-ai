@@ -7,21 +7,7 @@ import { analyzeProductAI } from '../services/gemini.js';
 import { db, APP_ID } from '../firebaseConfig.js';
 import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-
-// Call Gemini through backend proxy if available, else direct via client service
 async function analyzeProductWithAI(query, type, imageBase64) {
-  if (BACKEND_URL) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/analyzeProduct`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, type, imageBase64 }),
-      });
-      if (res.ok) return await res.json();
-    } catch { /* fall through to direct */ }
-  }
-
   return await analyzeProductAI({ query, type, imageBase64 });
 }
 

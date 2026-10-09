@@ -8,6 +8,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   build: {
+    emptyOutDir: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
