@@ -23,7 +23,8 @@ describe('Security & Environment Tests', () => {
     // Ensure no real Google API keys (starting with AIza) are committed to the public example template
     expect(content).not.toMatch(/AIza[0-9A-Za-z-_]{35}/);
     expect(content).toContain('VITE_FIREBASE_API_KEY');
-    expect(content).toContain('VITE_GEMINI_API_KEY');
+    expect(content).toContain('VITE_BACKEND_URL');
+    expect(content).not.toContain('VITE_GEMINI_API_KEY');
   });
 
   it('ensures Firestore rules protect user documents and collections', () => {
@@ -42,5 +43,29 @@ describe('Security & Environment Tests', () => {
     const config = JSON.parse(fs.readFileSync(fbPath, 'utf8'));
     expect(config.hosting.public).toBe('dist');
     expect(config.hosting.rewrites).toBeDefined();
+  });
+
+  it('ensures client-side source code contains zero direct Gemini SDK imports or VITE_GEMINI_API_KEY references', () => {
+    const geminiServicePath = path.join(rootDir, 'src/services/gemini.js');
+    expect(fs.existsSync(geminiServicePath)).toBe(true);
+
+    const serviceCode = fs.readFileSync(geminiServicePath, 'utf8');
+    expect(serviceCode).not.toContain('@google/generative-ai');
+    expect(serviceCode).not.toContain('VITE_GEMINI_API_KEY');
+    expect(serviceCode).not.toContain('generativelanguage.googleapis.com');
+  });
+
+  it('ensures package.json dependencies do not include @google/generative-ai in client bundle', () => {
+    const pkgPath = path.join(rootDir, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    expect(pkg.dependencies['@google/generative-ai']).toBeUndefined();
+  });
+
+  it('ensures Firestore rules prevent unauthorized modification of administrative and role fields', () => {
+    const rulesPath = path.join(rootDir, 'firestore.rules');
+    const rules = fs.readFileSync(rulesPath, 'utf8');
+    expect(rules).toContain('notModifyingProtectedFields');
+    expect(rules).toContain('isAdmin');
+    expect(rules).toContain('role');
   });
 });

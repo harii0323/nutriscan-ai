@@ -210,3 +210,68 @@ describe('Unit Tests: Chatbot History Sanitization', () => {
     expect(history[1].parts[0].text).toBe('Yes, oats are great.');
   });
 });
+
+describe('Unit Tests: Cookie Consent Lifecycle & Enforcement', () => {
+  it('saves consent preferences and persists to localStorage', async () => {
+    const { saveConsentPreferences, getConsentPreferences } = await import('../services/cookieConsent.js');
+    saveConsentPreferences({ functional: true, analytics: false });
+    const prefs = getConsentPreferences();
+    expect(prefs).not.toBeNull();
+    expect(prefs.strictlyNecessary).toBe(true);
+    expect(prefs.functional).toBe(true);
+    expect(prefs.analytics).toBe(false);
+  });
+
+  it('rejects optional cookies and purges functional storage upon withdrawal', async () => {
+    const { rejectOptionalCookies, getConsentPreferences, isConsentGranted } = await import('../services/cookieConsent.js');
+    localStorage.setItem('nutriscan_ui_prefs', JSON.stringify({ mode: 'compact' }));
+    rejectOptionalCookies();
+    const prefs = getConsentPreferences();
+    expect(prefs.functional).toBe(false);
+    expect(prefs.analytics).toBe(false);
+    expect(isConsentGranted('functional')).toBe(false);
+    expect(isConsentGranted('strictlyNecessary')).toBe(true);
+    expect(localStorage.getItem('nutriscan_ui_prefs')).toBeNull();
+  });
+});
+
+describe('Unit Tests: Business Configuration Audit', () => {
+  it('identifies unconfigured placeholder fields', async () => {
+    const { validateBusinessConfiguration } = await import('../config/businessConfig.js');
+    const result = validateBusinessConfiguration(false);
+    expect(typeof result.valid).toBe('boolean');
+    expect(Array.isArray(result.issues)).toBe(true);
+    expect(result.issues.some(i => i.field === 'legalName')).toBe(true);
+  });
+});
+
+describe('Unit Tests: Personal Data Export Formatting', () => {
+  it('generates structured DPDP-compliant user data export payload', () => {
+    const exportPayload = {
+      exportVersion: '1.0',
+      exportedAt: new Date().toISOString(),
+      account: {
+        uid: 'user-789',
+        email: 'user@example.com',
+        displayName: 'John Doe',
+      },
+      profile: {
+        dietaryPreferences: ['vegetarian'],
+        allergies: ['peanuts'],
+        targetCalories: 2100,
+      },
+      scans: [
+        { name: 'Oatmeal', calories: 150, scannedAt: '2026-10-09T00:00:00Z' },
+      ],
+      savedProducts: [
+        { name: 'Greek Yogurt', healthGrade: 'A' },
+      ],
+    };
+
+    expect(exportPayload.account.uid).toBe('user-789');
+    expect(exportPayload.profile.allergies).toContain('peanuts');
+    expect(exportPayload.scans).toHaveLength(1);
+    expect(exportPayload.savedProducts[0].healthGrade).toBe('A');
+  });
+});
+

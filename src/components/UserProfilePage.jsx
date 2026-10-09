@@ -143,26 +143,52 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     setDeleteError('');
+    const RAW_BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+    const BACKEND_URL = RAW_BACKEND_URL.replace(/\/$/, '') || '/api';
+
     try {
-      // 1. Delete all saved products in Firestore
-      const savedRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'savedProducts');
-      const savedSnap = await getDocs(savedRef);
-      for (const d of savedSnap.docs) {
-        await deleteDoc(d.ref);
+      let serverDeleted = false;
+      // 1. Try server-side authorized complete deletion workflow
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) {
+          const res = await fetch(`${BACKEND_URL}/deleteAccount`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+          });
+          if (res.ok) {
+            serverDeleted = true;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend deletion call skipped/failed, proceeding with direct fallback:', backendErr);
       }
 
-      // 2. Delete all scans in Firestore
-      const scansRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'scans');
-      const scansSnap = await getDocs(scansRef);
-      for (const d of scansSnap.docs) {
-        await deleteDoc(d.ref);
+      // 2. Direct fallback if server-side endpoint not deployed or reached
+      if (!serverDeleted) {
+        // Delete all saved products in Firestore
+        const savedRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'savedProducts');
+        const savedSnap = await getDocs(savedRef);
+        for (const d of savedSnap.docs) {
+          await deleteDoc(d.ref);
+        }
+
+        // Delete all scans in Firestore
+        const scansRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'scans');
+        const scansSnap = await getDocs(scansRef);
+        for (const d of scansSnap.docs) {
+          await deleteDoc(d.ref);
+        }
+
+        // Delete user document in Firestore
+        await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
+
+        // Delete user account in Firebase Auth
+        await deleteUser(auth.currentUser || user);
       }
-
-      // 3. Delete user document in Firestore
-      await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
-
-      // 4. Delete user account in Firebase Auth
-      await deleteUser(auth.currentUser || user);
 
       setDeleteModalOpen(false);
       onSignOut?.();

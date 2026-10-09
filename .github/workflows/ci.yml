@@ -1,0 +1,47 @@
+name: NutriScan AI CI/CD & Security Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-and-build:
+    name: Lint, Test, Build & Secret Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Install Functions Dependencies
+        run: npm --prefix functions ci
+
+      - name: Code Quality & Linting (Oxlint)
+        run: npm run lint
+
+      - name: Business & Legal Configuration Audit
+        run: npm run validate:config
+
+      - name: Backend Type-Check & Compilation
+        run: npm run build:functions
+
+      - name: Automated Unit, Integration & Security Tests
+        run: npm run test:fast
+
+      - name: Production Frontend Build (Vite)
+        run: npm run build
+
+      - name: Production Asset Secret Scanner
+        run: npm run scan:secrets

@@ -59,6 +59,7 @@ export function saveConsentPreferences(preferences) {
   };
   try {
     localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(payload));
+    enforceConsentPolicies();
     window.dispatchEvent(new CustomEvent(CONSENT_EVENT_NAME, { detail: payload }));
   } catch (e) {
     console.warn('Failed to save consent choices:', e);
@@ -72,6 +73,24 @@ export function acceptAllCookies() {
 
 export function rejectOptionalCookies() {
   return saveConsentPreferences({ functional: false, analytics: false });
+}
+
+export function isConsentGranted(category) {
+  const prefs = getConsentPreferences();
+  if (category === 'strictlyNecessary') return true;
+  return Boolean(prefs?.[category]);
+}
+
+export function enforceConsentPolicies() {
+  if (typeof window === 'undefined') return;
+  const prefs = getConsentPreferences();
+  if (!prefs?.functional) {
+    try {
+      localStorage.removeItem('nutriscan_ui_prefs');
+    } catch {
+      // ignore storage access errors
+    }
+  }
 }
 
 export function hasUserRespondedToConsent() {
