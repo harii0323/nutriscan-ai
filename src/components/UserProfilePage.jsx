@@ -1,10 +1,14 @@
-// User Profile Page – Member dashboard & history
+// User Profile Page – Member dashboard, history, and DPDP-compliant data controls
 import React, { useState, useEffect } from 'react';
-import { Edit2, Star, Clock, LogOut, User, Mail, ChevronRight } from 'lucide-react';
-import { PageWrapper, EmptyState, GradeBadge } from './Shared.jsx';
-import { updateProfile } from 'firebase/auth';
-import { db, APP_ID } from '../firebaseConfig.js';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import {
+  Edit2, Bookmark, Clock, LogOut, User, Mail, ChevronRight,
+  Download, Trash2, Shield, Settings, AlertTriangle, Search
+} from 'lucide-react';
+import { PageWrapper, EmptyState, GradeBadge, ModalOverlay } from './Shared.jsx';
+import { updateProfile, deleteUser } from 'firebase/auth';
+import { db, auth, APP_ID } from '../firebaseConfig.js';
+import { collection, getDocs, query, orderBy, limit, doc, deleteDoc } from 'firebase/firestore';
+import CookieConsentBanner from './CookieConsentBanner.jsx';
 
 export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavigate }) {
   const [editMode, setEditMode] = useState(false);
@@ -13,6 +17,13 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
   const [savedProducts, setSavedProducts] = useState([]);
   const [recentScans, setRecentScans] = useState([]);
   const [loadingData, setLoadingData] = useState(Boolean(user));
+
+  // Privacy & Data control states
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [exportingData, setExportingData] = useState(false);
+  const [cookieSettingsOpen, setCookieSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -91,6 +102,82 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
     }
   };
 
+  // DPDP Act Section 11: Right to Access & Download Personal Data
+  const handleDownloadData = async () => {
+    setExportingData(true);
+    try {
+      const exportObject = {
+        exportMetadata: {
+          platform: 'NutriScan AI',
+          exportedAt: new Date().toISOString(),
+          dataPrincipalId: user.uid,
+          statutoryFramework: 'Digital Personal Data Protection Act, 2023 (India)',
+        },
+        accountProfile: {
+          uid: user.uid,
+          email: user.email || null,
+          displayName: user.displayName || null,
+          phoneNumber: user.phoneNumber || null,
+          createdAt: user.metadata?.creationTime || null,
+          lastLoginAt: user.metadata?.lastSignInTime || null,
+        },
+        savedProducts: savedProducts,
+        recentScans: recentScans,
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportObject, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `nutriscan-personal-data-${user.uid.slice(0, 8)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } catch (err) {
+      console.error('Failed to export personal data:', err);
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  // DPDP Act Section 12: Right to Erasure / Account Deletion
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    setDeleteError('');
+    try {
+      // 1. Delete all saved products in Firestore
+      const savedRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'savedProducts');
+      const savedSnap = await getDocs(savedRef);
+      for (const d of savedSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+
+      // 2. Delete all scans in Firestore
+      const scansRef = collection(db, 'artifacts', APP_ID, 'users', user.uid, 'scans');
+      const scansSnap = await getDocs(scansRef);
+      for (const d of scansSnap.docs) {
+        await deleteDoc(d.ref);
+      }
+
+      // 3. Delete user document in Firestore
+      await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', user.uid));
+
+      // 4. Delete user account in Firebase Auth
+      await deleteUser(auth.currentUser || user);
+
+      setDeleteModalOpen(false);
+      onSignOut?.();
+    } catch (err) {
+      console.error('Error during account erasure:', err);
+      if (err?.code === 'auth/requires-recent-login') {
+        setDeleteError('For security, your credentials require re-authentication. Please sign out and sign back in before requesting account deletion.');
+      } else {
+        setDeleteError(err?.message || 'Failed to delete account. Please contact support.');
+      }
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   const initials = (user.displayName || user.email || '?').slice(0, 2).toUpperCase();
 
   return (
@@ -102,7 +189,7 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
           {/* Avatar */}
           <div style={{ position: 'relative', display: 'inline-block', marginBottom: '1.25rem' }}>
             {user.photoURL ? (
-              <img src={user.photoURL} alt="Profile"
+              <img src={user.photoURL} alt="User profile"
                 style={{ width: 88, height: 88, borderRadius: '50%', objectFit: 'cover', border: '3px solid #0E3B2E' }} />
             ) : (
               <div style={{
@@ -166,7 +253,7 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
             ].map(stat => (
               <div key={stat.label} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: stat.color, fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                  {loadingData ? '–' : stat.value}
+                  {loadingData ? '-' : stat.value}
                 </div>
                 <div style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600, marginTop: '0.25rem' }}>{stat.label}</div>
               </div>
@@ -177,10 +264,10 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
         {/* Saved Products */}
         <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
           <h3 style={{ margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', color: '#0F172A' }}>
-            <Star size={18} color="#D97706" /> Saved Products ({savedProducts.length})
+            <Bookmark size={18} color="#D97706" /> Saved Products ({savedProducts.length})
           </h3>
           {savedProducts.length === 0 ? (
-            <EmptyState icon="⭐" title="No products saved yet" description="Save products while scanning to access them here." />
+            <EmptyState icon={<Bookmark size={24} color="#D97706" />} title="No products saved yet" description="Save products while scanning to access them here." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {savedProducts.map((prod) => (
@@ -215,7 +302,7 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
             <Clock size={18} color="#0E3B2E" /> Recent Scans ({recentScans.length})
           </h3>
           {recentScans.length === 0 ? (
-            <EmptyState icon="🔍" title="No recent scans" description="Your scan history will appear here after you analyze products." />
+            <EmptyState icon={<Search size={24} color="#0E3B2E" />} title="No recent scans" description="Your scan history will appear here after you analyze products." />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {recentScans.map((scan) => (
@@ -244,22 +331,141 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
           )}
         </div>
 
+        {/* ── Data & Privacy Controls (DPDP Act Compliance) ───────────────── */}
+        <div className="card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+          <h3 style={{ margin: '0 0 0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem', color: '#0F172A' }}>
+            <Shield size={18} color="#0E3B2E" /> Data & Privacy Controls
+          </h3>
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.84rem', color: '#64748B', lineHeight: 1.5 }}>
+            Manage your personal data under the Digital Personal Data Protection Act, 2023. You can export all records or permanently delete your account.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+            {/* Download Data */}
+            <button
+              onClick={handleDownloadData}
+              disabled={exportingData}
+              className="btn-secondary"
+              style={{ justifyContent: 'center', padding: '0.75rem 1rem', fontSize: '0.86rem' }}
+            >
+              <Download size={15} />
+              {exportingData ? 'Generating…' : 'Download my data'}
+            </button>
+
+            {/* Cookie Preferences */}
+            <button
+              onClick={() => setCookieSettingsOpen(true)}
+              className="btn-secondary"
+              style={{ justifyContent: 'center', padding: '0.75rem 1rem', fontSize: '0.86rem' }}
+            >
+              <Settings size={15} />
+              Manage cookie preferences
+            </button>
+
+            {/* Delete Account */}
+            <button
+              onClick={() => { setDeleteError(''); setDeleteModalOpen(true); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                padding: '0.75rem 1rem', background: '#FEF2F2', border: '1px solid #FECACA',
+                borderRadius: '0.75rem', color: '#DC2626', fontWeight: 600, fontSize: '0.86rem',
+                cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'background-color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
+              onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
+            >
+              <Trash2 size={15} />
+              Delete account
+            </button>
+          </div>
+        </div>
+
         {/* Sign out */}
         <button
           onClick={onSignOut}
           style={{
-            width: '100%', padding: '0.85rem', background: '#FEF2F2',
-            border: '1.5px solid #FECACA', borderRadius: '0.85rem',
-            color: '#DC2626', fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+            width: '100%', padding: '0.85rem', background: '#FFFFFF',
+            border: '1.5px solid #CBD5E1', borderRadius: '0.85rem',
+            color: '#475569', fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter, sans-serif',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-            fontSize: '0.94rem', transition: 'background-color 0.15s',
+            fontSize: '0.94rem', transition: 'background-color 0.15s, color 0.15s',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
-          onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
+          onMouseEnter={e => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#0F172A'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#FFFFFF'; e.currentTarget.style.color = '#475569'; }}
         >
           <LogOut size={17} /> Sign Out
         </button>
+
       </div>
+
+      {/* ── Account Deletion Confirmation Modal ──────────────────────────── */}
+      <ModalOverlay isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} maxWidth="520px">
+        <div style={{ textAlign: 'left' }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: '#FEF2F2',
+            border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            marginBottom: '1rem',
+          }}>
+            <AlertTriangle size={22} color="#DC2626" />
+          </div>
+
+          <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', color: '#0F172A' }}>
+            Permanently Delete Account?
+          </h3>
+
+          <p style={{ margin: '0 0 1rem', color: '#4B5563', fontSize: '0.88rem', lineHeight: 1.6 }}>
+            This action is permanent and cannot be undone. In accordance with Section 12 of India's Digital Personal Data Protection Act, 2023:
+          </p>
+
+          <ul style={{ margin: '0 0 1.25rem', paddingLeft: '1.2rem', color: '#64748B', fontSize: '0.84rem', lineHeight: 1.6 }}>
+            <li>All saved products and nutritional bookmarks will be deleted from Cloud Firestore.</li>
+            <li>Your scan history and portion records will be purged.</li>
+            <li>Your authentication profile will be permanently deleted.</li>
+          </ul>
+
+          {deleteError && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '0.75rem',
+              padding: '0.75rem 1rem', color: '#B91C1C', fontSize: '0.84rem', marginBottom: '1.25rem',
+            }}>
+              {deleteError}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setDeleteModalOpen(false)}
+              disabled={deletingAccount}
+              className="btn-secondary"
+              style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deletingAccount}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                background: '#DC2626', color: '#FFFFFF', border: 'none', borderRadius: '0.75rem',
+                padding: '0.6rem 1.35rem', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              <Trash2 size={15} />
+              {deletingAccount ? 'Purging data…' : 'Permanently Delete My Account'}
+            </button>
+          </div>
+        </div>
+      </ModalOverlay>
+
+      {/* Cookie settings modal trigger */}
+      {cookieSettingsOpen && (
+        <CookieConsentBanner
+          onNavigate={onNavigate}
+          forceOpen={true}
+          onCloseModal={() => setCookieSettingsOpen(false)}
+        />
+      )}
     </PageWrapper>
   );
 }

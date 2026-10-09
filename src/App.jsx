@@ -10,6 +10,8 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 import AuthModal from './components/Modals.jsx';
 import HomePage from './components/HomePage.jsx';
+import CookieConsentBanner from './components/CookieConsentBanner.jsx';
+import { BUSINESS_CONFIG } from './config/businessConfig.js';
 
 // Code-split secondary routes for rapid initial load and optimal performance
 const ProductDetailsPage = lazy(() => import('./components/ProductDetailsPage.jsx'));
@@ -17,6 +19,10 @@ const NutritionAnalysisPage = lazy(() => import('./components/NutritionAnalysisP
 const BlogPage = lazy(() => import('./components/BlogPage.jsx'));
 const ChatbotInterface = lazy(() => import('./components/ChatbotInterface.jsx'));
 const UserProfilePage = lazy(() => import('./components/UserProfilePage.jsx'));
+const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage.jsx'));
+const TermsPage = lazy(() => import('./components/TermsPage.jsx'));
+const CookiePolicyPage = lazy(() => import('./components/CookiePolicyPage.jsx'));
+const RefundPolicyPage = lazy(() => import('./components/RefundPolicyPage.jsx'));
 
 function PageLoader() {
   return (
@@ -92,7 +98,7 @@ export default function App() {
           </span>
           <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#A7F3D0' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', display: 'inline-block' }} />
-            2.4M+ Verified Product Profiles
+            Real-time Multimodal Label Analysis
           </span>
         </div>
       </div>
@@ -292,6 +298,26 @@ export default function App() {
                 <UserProfilePage user={user} onSignOut={handleSignOut} onAuthRequest={() => setAuthOpen(true)} onNavigate={navigate} />
               </motion.div>
             )}
+            {page.name === 'privacy' && (
+              <motion.div key="privacy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <PrivacyPolicyPage onNavigate={navigate} />
+              </motion.div>
+            )}
+            {page.name === 'terms' && (
+              <motion.div key="terms" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <TermsPage onNavigate={navigate} />
+              </motion.div>
+            )}
+            {page.name === 'cookies' && (
+              <motion.div key="cookies" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <CookiePolicyPage onNavigate={navigate} />
+              </motion.div>
+            )}
+            {page.name === 'refund' && (
+              <motion.div key="refund" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <RefundPolicyPage onNavigate={navigate} />
+              </motion.div>
+            )}
           </AnimatePresence>
         </Suspense>
       </main>
@@ -302,9 +328,9 @@ export default function App() {
         color: '#E2E8F0',
         borderTop: '1px solid rgba(255,255,255,0.08)',
         marginTop: 'auto',
-      }} className="hidden md:block">
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '3.5rem 1.5rem 2rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr', gap: '3rem', marginBottom: '3rem' }}>
+      }} className="block">
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '3.5rem 1.5rem 5.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '2.5rem', marginBottom: '3rem' }}>
             {/* Col 1: Brand & Mission */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
@@ -316,14 +342,14 @@ export default function App() {
                   <Leaf size={17} color="white" />
                 </div>
                 <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: '1.2rem', color: '#FFFFFF' }}>
-                  NutriScan Intelligence
+                  {BUSINESS_CONFIG.brandName}
                 </span>
               </div>
               <p style={{ color: '#94A3B8', fontSize: '0.86rem', lineHeight: 1.7, maxWidth: 360, margin: '0 0 1.25rem' }}>
                 Independent consumer safety intelligence. We decode ultra-processed foods, cosmetic chemicals, and dietary additives to help consumers make clean, evidence-based choices.
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#86EFAC', fontSize: '0.8rem', fontWeight: 500 }}>
-                <ShieldCheck size={16} /> 100% Non-Sponsored & Unbiased Evaluations
+                <ShieldCheck size={16} /> Independent Nutritional & Ingredient Evaluations
               </div>
             </div>
 
@@ -341,10 +367,10 @@ export default function App() {
               </ul>
             </div>
 
-            {/* Col 3: Platform */}
+            {/* Col 3: Platform & Legal Policies */}
             <div>
               <h4 style={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 1rem', fontFamily: 'Inter, sans-serif' }}>
-                Platform
+                Platform & Legal
               </h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.84rem' }}>
                 <li>
@@ -367,6 +393,26 @@ export default function App() {
                     Ingredient AI Assistant
                   </button>
                 </li>
+                <li>
+                  <button onClick={() => navigate('privacy')} style={{ background: 'none', border: 'none', padding: 0, color: '#86EFAC', cursor: 'pointer', fontSize: 'inherit', fontWeight: 500 }}>
+                    Privacy Policy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('terms')} style={{ background: 'none', border: 'none', padding: 0, color: '#86EFAC', cursor: 'pointer', fontSize: 'inherit', fontWeight: 500 }}>
+                    Terms and Conditions
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('cookies')} style={{ background: 'none', border: 'none', padding: 0, color: '#86EFAC', cursor: 'pointer', fontSize: 'inherit', fontWeight: 500 }}>
+                    Cookie & Storage Policy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => navigate('refund')} style={{ background: 'none', border: 'none', padding: 0, color: '#86EFAC', cursor: 'pointer', fontSize: 'inherit', fontWeight: 500 }}>
+                    Refund & Pricing Policy
+                  </button>
+                </li>
               </ul>
             </div>
 
@@ -375,9 +421,15 @@ export default function App() {
               <h4 style={{ color: '#FFFFFF', fontSize: '0.92rem', fontWeight: 700, margin: '0 0 1rem', fontFamily: 'Inter, sans-serif' }}>
                 Medical Disclaimer
               </h4>
-              <p style={{ color: '#94A3B8', fontSize: '0.78rem', lineHeight: 1.65, margin: 0 }}>
+              <p style={{ color: '#94A3B8', fontSize: '0.78rem', lineHeight: 1.65, margin: '0 0 1rem' }}>
                 NutriScan AI is an educational reference platform. Assessments are synthesized from product label declarations and recognized nutrition databases. This service does not constitute personal medical diagnosis or medical advice.
               </p>
+              <div style={{ color: '#64748B', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                <div><strong>DPDP Grievance Contact:</strong></div>
+                <a href={`mailto:${BUSINESS_CONFIG.grievanceEmail}`} style={{ color: '#86EFAC', textDecoration: 'none' }}>
+                  {BUSINESS_CONFIG.grievanceEmail}
+                </a>
+              </div>
             </div>
           </div>
 
@@ -394,12 +446,33 @@ export default function App() {
             gap: '1rem',
           }}>
             <div>
-              © 2026 NutriScan Technologies Inc. All rights reserved.
+              © 2026 {BUSINESS_CONFIG.legalName}. All rights reserved.
             </div>
-            <div style={{ display: 'flex', gap: '1.5rem' }}>
-              <span>Privacy Policy</span>
-              <span>Terms of Service</span>
-              <span>Methodology & Peer Review</span>
+            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                onClick={() => navigate('privacy')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#94A3B8', cursor: 'pointer', fontSize: 'inherit' }}
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => navigate('terms')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#94A3B8', cursor: 'pointer', fontSize: 'inherit' }}
+              >
+                Terms of Service
+              </button>
+              <button
+                onClick={() => navigate('cookies')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#94A3B8', cursor: 'pointer', fontSize: 'inherit' }}
+              >
+                Cookie Policy
+              </button>
+              <button
+                onClick={() => navigate('refund')}
+                style={{ background: 'none', border: 'none', padding: 0, color: '#94A3B8', cursor: 'pointer', fontSize: 'inherit' }}
+              >
+                Refund Policy
+              </button>
             </div>
           </div>
         </div>
@@ -449,7 +522,10 @@ export default function App() {
       </nav>
 
       {/* ── Auth Modal ─────────────────────────────────────────────────── */}
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} />
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onNavigate={navigate} />
+
+      {/* ── Cookie Consent Banner ───────────────────────────────────────── */}
+      <CookieConsentBanner onNavigate={navigate} />
 
       {/* ── Responsive Visibility Style ────────────────────────────────── */}
       <style>{`

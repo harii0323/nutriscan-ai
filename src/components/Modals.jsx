@@ -1,5 +1,5 @@
 // Auth modals: Login, Signup, Phone OTP
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, Phone, Eye, EyeOff, Leaf } from 'lucide-react';
 import {
@@ -14,7 +14,7 @@ import {
 import { auth, googleProvider } from '../firebaseConfig.js';
 import { Spinner } from './Shared.jsx';
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', onNavigate }) {
   const [mode, setMode] = useState(initialMode); // login | signup | phone | forgot
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,21 +26,39 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [step, setStep] = useState('input'); // input | otp
+  const [termsConsent, setTermsConsent] = useState(false);
+  const [newsletterConsent, setNewsletterConsent] = useState(false);
   const confirmRef = useRef(null);
   const recaptchaContainerRef = useRef(null);
+
+  const handleClose = useCallback(() => {
+    setError('');
+    setResetSent(false);
+    setStep('input');
+    setTermsConsent(false);
+    setNewsletterConsent(false);
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleClose]);
 
   const switchMode = (newMode) => {
     setMode(newMode);
     setError('');
     setResetSent(false);
     setStep('input');
-  };
-
-  const handleClose = () => {
-    setError('');
-    setResetSent(false);
-    setStep('input');
-    onClose();
+    setTermsConsent(false);
+    setNewsletterConsent(false);
   };
 
   const handleResetPassword = async (e) => {
@@ -70,6 +88,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
   const handleEmail = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (mode === 'signup' && !termsConsent) {
+      setError('Please agree to the Terms of Service and Privacy Policy to create an account.');
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === 'login') {
@@ -78,7 +102,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         if (displayName) await updateProfile(cred.user, { displayName });
       }
-      onClose();
+      handleClose();
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
@@ -251,7 +275,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                     onChange={e => setDisplayName(e.target.value)} />
                 )}
                 <InputField icon={<Mail size={16} />} type="email" placeholder="Email address" value={email}
-                  onChange={e => setEmail(e.target.value)} required />
+                    onChange={e => setEmail(e.target.value)} required />
                 <InputField
                   icon={<Lock size={16} />}
                   type={showPass ? 'text' : 'password'}
@@ -280,6 +304,57 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login' }) {
                     >
                       Forgot password?
                     </button>
+                  </div>
+                )}
+
+                {mode === 'signup' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '0.25rem', fontSize: '0.82rem', color: '#4B5563' }}>
+                    {/* Mandatory Terms & Privacy Consent */}
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', cursor: 'pointer', lineHeight: 1.45 }}>
+                      <input
+                        type="checkbox"
+                        checked={termsConsent}
+                        onChange={e => setTermsConsent(e.target.checked)}
+                        style={{ marginTop: 2, accentColor: '#0E3B2E', width: 16, height: 16, cursor: 'pointer' }}
+                        required
+                      />
+                      <span>
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleClose(); onNavigate?.('terms'); }}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#0E3B2E', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+                        >
+                          Terms of Service
+                        </button>
+                        {' '}and{' '}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); handleClose(); onNavigate?.('privacy'); }}
+                          style={{ background: 'none', border: 'none', padding: 0, color: '#0E3B2E', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
+                        >
+                          Privacy Policy
+                        </button>.
+                      </span>
+                    </label>
+
+                    {/* Unbundled Optional Newsletter Consent */}
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', cursor: 'pointer', lineHeight: 1.45 }}>
+                      <input
+                        type="checkbox"
+                        checked={newsletterConsent}
+                        onChange={e => setNewsletterConsent(e.target.checked)}
+                        style={{ marginTop: 2, accentColor: '#0E3B2E', width: 16, height: 16, cursor: 'pointer' }}
+                      />
+                      <span style={{ color: '#64748B' }}>
+                        Send me periodic research digests and safety alerts (optional).
+                      </span>
+                    </label>
+
+                    {/* Age and Parental Guidance Notice */}
+                    <div style={{ fontSize: '0.74rem', color: '#94A3B8', lineHeight: 1.4 }}>
+                      By registering, you confirm that you are at least 18 years of age or accessing under parental guidance.
+                    </div>
                   </div>
                 )}
 

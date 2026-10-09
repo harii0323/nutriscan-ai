@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Upload, Camera, Link, X, RefreshCw, Brain, Lightbulb, ChefHat,
-  Scale, Activity, PieChart
+  Scale, Activity, PieChart, CheckCircle2
 } from 'lucide-react';
 import { PageWrapper, Spinner, GradeBadge, NutritionCard, InfoCard, ModalOverlay } from './Shared.jsx';
 import {
@@ -253,11 +253,11 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
           }}>
             <Activity size={13} /> Macronutrient & Calorie Intelligence
           </div>
-          <h1 style={{ fontSize: '2rem', margin: '0 0 0.5rem', color: '#0F172A', letterSpacing: '-0.02em' }}>
-            🥗 Calories Analysis
+          <h1 style={{ fontSize: '2rem', margin: '0 0 0.5rem', color: '#0F172A', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <Activity size={24} color="#0E3B2E" /> Calories Analysis
           </h1>
           <p style={{ color: '#4B5563', margin: 0, fontSize: '0.94rem' }}>
-            Analyze any food — search by name, upload a meal photo, or calculate custom serving portions.
+            Analyze any food: search by name, upload a meal photo, or calculate custom serving portions.
           </p>
         </div>
 
@@ -384,7 +384,9 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
               {/* Nutrition Breakdown & Macros */}
               <div className="card" style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                  <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#0F172A' }}>📊 Nutrition Details</h2>
+                  <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <PieChart size={18} color="#0E3B2E" /> Nutrition Details
+                  </h2>
                   <span style={{ fontSize: '0.8rem', color: '#334155', background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '99px', padding: '0.25rem 0.75rem', fontWeight: 600 }}>
                     Showing for: {n?.serving || '100g'}
                   </span>
@@ -424,6 +426,25 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#EA580C' }} /> Fat {fatPct}%
                     </span>
                   </div>
+
+                  {/* Accessible Data Table Equivalent for WCAG 2.2 AA */}
+                  <div className="sr-only">
+                    <table>
+                      <caption>Energy Distribution by Macronutrient</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Nutrient</th>
+                          <th scope="col">Caloric Share</th>
+                          <th scope="col">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>Carbohydrates</td><td>{carbPct}%</td><td>{n?.carbs}g</td></tr>
+                        <tr><td>Protein</td><td>{proteinPct}%</td><td>{n?.protein}g</td></tr>
+                        <tr><td>Fat</td><td>{fatPct}%</td><td>{n?.fat}g</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 {/* Recalculation Form */}
@@ -461,7 +482,9 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
 
               {/* Scientific Insights Console */}
               <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', color: '#0F172A' }}>🤖 AI Insights</h2>
+                <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <Brain size={18} color="#0E3B2E" /> AI Nutritional Insights
+                </h2>
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                   <button
                     onClick={() => handleInsight('coach')} disabled={!!insightLoading}
@@ -522,7 +545,9 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
               {/* Cleaner Alternatives */}
               {result.alternatives?.length > 0 && (
                 <div className="card">
-                  <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', color: '#0F172A' }}>✅ Healthier Alternatives</h2>
+                  <h2 style={{ margin: '0 0 1rem', fontSize: '1.15rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <CheckCircle2 size={18} color="#15803D" /> Healthier Alternatives
+                  </h2>
                   {result.alternatives.map((alt, i) => (
                     <div key={i} style={{
                       borderLeft: '4px solid #166534', paddingLeft: '1rem',
@@ -543,7 +568,9 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
 
       {/* Multi-item detection modal */}
       <ModalOverlay isOpen={showItemModal} onClose={() => setShowItemModal(false)} maxWidth="460px">
-        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', color: '#0F172A' }}>🍽️ Multiple Items Detected!</h3>
+        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.25rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Scale size={20} color="#0E3B2E" /> Multiple Items Detected
+        </h3>
         <p style={{ color: '#64748B', fontSize: '0.9rem', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
           Our computer vision detected {detectedItems.length} distinct food items on this plate. Select an individual component or calculate the entire meal.
         </p>
@@ -554,7 +581,7 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
             analyze(detectedItems.join(', '), true);
           }}
           style={{ width: '100%', justifyContent: 'center', marginBottom: '0.85rem', padding: '0.8rem' }}>
-          📊 Analyze Full Plate
+          <Activity size={16} /> Analyze Full Plate
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {detectedItems.map((item, i) => (
@@ -587,7 +614,9 @@ export default function NutritionAnalysisPage({ user, onNavigate: _onNavigate })
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
             style={{ background: '#0F172A', borderRadius: '1.25rem', overflow: 'hidden', width: '100%', maxWidth: 480, border: '1px solid rgba(255,255,255,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1.1rem 1.25rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ color: 'white', fontWeight: 600, fontSize: '1rem' }}>📷 Scan Food</span>
+              <span style={{ color: 'white', fontWeight: 600, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Camera size={16} color="#4ADE80" /> Scan Food
+              </span>
               <button onClick={closeCamera} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%',
                 width: 32, height: 32, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={16} />

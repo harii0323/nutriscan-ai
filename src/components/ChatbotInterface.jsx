@@ -68,7 +68,7 @@ function getMsgId() {
 
 export default function ChatbotInterface({ user, onAuthRequest }) {
   const [messages, setMessages] = useState([
-    { id: 1, role: 'assistant', content: '👋 Hi! I\'m NutriScan Assistant. Ask me anything about food ingredients, nutrition, or product safety. I\'m here to help you make healthier choices!' },
+    { id: 1, role: 'assistant', content: 'Hello! I am NutriScan Assistant. Ask me anything about food ingredients, nutrition, or product safety. I am here to help you make healthier choices!' },
   ]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
@@ -94,7 +94,7 @@ export default function ChatbotInterface({ user, onAuthRequest }) {
       setMessages(prev => [...prev, { id: getMsgId(), role: 'assistant', content: aiText }]);
     } catch (err) {
       console.error('Chatbot error:', err);
-      setMessages(prev => [...prev, { id: getMsgId(), role: 'assistant', content: `⚠️ ${err.message || 'Sorry, I encountered an error. Please try again.'}` }]);
+      setMessages(prev => [...prev, { id: getMsgId(), role: 'assistant', content: err.message || 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setThinking(false);
     }
@@ -120,7 +120,7 @@ export default function ChatbotInterface({ user, onAuthRequest }) {
           </div>
           <div>
             <div style={{ fontWeight: 800, color: '#0F172A', fontFamily: 'Outfit, sans-serif', fontSize: '1.05rem', letterSpacing: '-0.01em' }}>
-              🤖 NutriScan Assistant
+              NutriScan Assistant
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.76rem', color: '#059669', fontWeight: 600 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />

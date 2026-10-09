@@ -1,7 +1,7 @@
 // Product Details Page – AI product analysis result
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bookmark, Share2, Check, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Bookmark, Share2, Check, ShieldAlert, FlaskConical, CheckCircle2 } from 'lucide-react';
 import { GradeBadge, IngredientRow, PageWrapper } from './Shared.jsx';
 import { analyzeProductAI } from '../services/gemini.js';
 import { db, APP_ID } from '../firebaseConfig.js';
@@ -296,7 +296,7 @@ export default function ProductDetailsPage({ data, onNavigate, user }) {
             <div className="card" style={{ marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
                 <h2 style={{ margin: 0, fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0F172A' }}>
-                  🧪 Ingredient Analysis
+                  <FlaskConical size={18} color="#0E3B2E" /> Ingredient Analysis
                 </h2>
 
                 {/* Filter Pills */}
@@ -358,7 +358,7 @@ export default function ProductDetailsPage({ data, onNavigate, user }) {
             {product.alternatives.length > 0 && (
               <div className="card">
                 <h2 style={{ margin: '0 0 1rem', fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0F172A' }}>
-                  ✅ Better Alternatives
+                  <CheckCircle2 size={18} color="#15803D" /> Better Alternatives
                 </h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
                   {product.alternatives.map((alt, i) => (

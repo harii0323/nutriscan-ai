@@ -277,8 +277,8 @@ describe('Functional Tests: NutritionAnalysisPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Avocado Toast')).toBeDefined();
       expect(screen.getByText('240')).toBeDefined(); // Calories
-      expect(screen.getByText('6g')).toBeDefined();  // Protein
-      expect(screen.getByText('22g')).toBeDefined(); // Carbs
+      expect(screen.getAllByText('6g').length).toBeGreaterThan(0);  // Protein
+      expect(screen.getAllByText('22g').length).toBeGreaterThan(0); // Carbs
     });
   });
 
@@ -303,7 +303,7 @@ describe('Functional Tests: NutritionAnalysisPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('480')).toBeDefined();
-      expect(screen.getByText('12g')).toBeDefined();
+      expect(screen.getAllByText('12g').length).toBeGreaterThan(0);
     });
   });
 

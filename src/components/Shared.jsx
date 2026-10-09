@@ -335,18 +335,30 @@ export function EmptyState({ icon, title, description }) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '3rem 1.5rem',
-        color: '#6B7280',
+        padding: '2.5rem 1.5rem',
+        color: '#64748B',
         textAlign: 'center',
         gap: '0.65rem',
-        background: '#F8FAF9',
+        background: '#F8FAFC',
         borderRadius: '1rem',
-        border: '1px dashed rgba(15, 23, 42, 0.12)',
+        border: '1px dashed #CBD5E1',
       }}
     >
-      <div style={{ fontSize: '2.4rem', opacity: 0.6, marginBottom: '0.25rem' }}>{icon}</div>
-      <h3 style={{ margin: 0, color: '#111827', fontSize: '0.98rem', fontWeight: 600 }}>{title}</h3>
-      {description && <p style={{ margin: 0, fontSize: '0.85rem', color: '#6B7280', maxWidth: 360 }}>{description}</p>}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 48,
+        height: 48,
+        borderRadius: '50%',
+        background: '#EDF2F7',
+        color: '#475569',
+        marginBottom: '0.25rem',
+      }}>
+        {icon}
+      </div>
+      <h3 style={{ margin: 0, color: '#0F172A', fontSize: '0.96rem', fontWeight: 600 }}>{title}</h3>
+      {description && <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748B', maxWidth: 360, lineHeight: 1.5 }}>{description}</p>}
     </div>
   );
 }

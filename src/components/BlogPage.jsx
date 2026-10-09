@@ -1,7 +1,7 @@
 // Health & Nutrition Blog page – Editorial research & consumer intelligence
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calendar, CheckCircle, Clock, ShieldCheck, BookOpen } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle, Clock, ShieldCheck, BookOpen, Search } from 'lucide-react';
 import { PageWrapper, ModalOverlay } from './Shared.jsx';
 
 const ARTICLES = [
@@ -11,10 +11,9 @@ const ARTICLES = [
     date: 'Sep 28, 2026',
     readTime: '5 min read',
     title: 'Understanding Food Labels in India',
-    excerpt: 'Decoding FSSAI labels, ingredient lists, and nutritional tables on Indian packaged foods what to look for and what to avoid.',
+    excerpt: 'Decoding FSSAI labels, ingredient lists, and nutritional tables on Indian packaged foods: what to look for and what to avoid.',
     color: '#0E3B2E',
-    emoji: '🏷️',
-    content: `Packaged food sales in India have grown more than 300% over the last decade. However, deciphering what actually goes into processed items remains tricky.
+    content: `Packaged food sales in India have grown significantly over the last decade. However, deciphering what actually goes into processed items remains critical.
 
 Key things to check on Indian food labels:
 1. The Ingredient Order: Ingredients are listed in descending order by weight. If sugar, palm oil, or refined wheat flour (maida) are in the top 3, the product is primarily processed carbs and fats.
@@ -22,7 +21,7 @@ Key things to check on Indian food labels:
 3. Sodium & Serving Sizes: Many nutrition tables report values "per 100g", whereas a single pack might be 250g or only 30g. Always calculate per actual serving consumed.
 4. Food Additives: Look out for artificial flavor enhancers like INS 621 (MSG) or preservatives like Sodium Benzoate (INS 211).
 
-Pro Tip: Use NutriScan AI's camera scanner to instantly grade any packaged item before putting it into your shopping cart!`,
+Pro Tip: Use NutriScan AI's camera scanner to evaluate any packaged item before putting it into your shopping cart!`,
   },
   {
     id: 2,
@@ -30,9 +29,8 @@ Pro Tip: Use NutriScan AI's camera scanner to instantly grade any packaged item 
     date: 'Sep 20, 2026',
     readTime: '4 min read',
     title: "The Truth About 'Sugar-Free' Claims",
-    excerpt: "Sugarfree doesn't mean calorie-free. Artificial sweeteners, hidden sugars, and the marketing tricks that fool consumers every day.",
+    excerpt: "Sugar-free does not mean calorie-free. Artificial sweeteners, hidden sugars, and the marketing strategies that confuse consumers every day.",
     color: '#DC2626',
-    emoji: '🍬',
     content: `Many beverages and sweets marketed as 'zero sugar' replace sucrose with non-nutritive sweeteners such as sucralose, aspartame, or acesulfame potassium.
 
 What science tells us:
@@ -48,9 +46,8 @@ Healthier Swaps: Choose natural whole foods, fresh fruits, or beverages infused 
     date: 'Sep 12, 2026',
     readTime: '6 min read',
     title: 'Navigating Personal Care Ingredients',
-    excerpt: 'Parabens, sulphates, phthalate a complete guide to identifying harmful chemicals in your skincare, haircare, and cosmetic products.',
+    excerpt: 'Parabens, sulphates, phthalates: a complete guide to identifying harmful chemicals in your skincare, haircare, and cosmetic products.',
     color: '#7C3AED',
-    emoji: '🧴',
     content: `Your skin is your largest organ, absorbing a significant percentage of topical products. Here is our quick safety checklist:
 
 1. Parabens (Methylparaben, Propylparaben): Used as preservatives; known endocrine disruptors. Look for "paraben-free" certified labels.
@@ -67,7 +64,6 @@ NutriScan Care Scanner classifies all cosmetic ingredients according to internat
     title: 'Supplements: What Science Actually Says',
     excerpt: 'The booming supplement industry promises everything. Here is what clinical evidence confirms and what is pure marketing hype.',
     color: '#2563EB',
-    emoji: '💊',
     content: `While multivitamin gummies and herbal extracts flood the shelves, evidence suggests whole food nutrition outperforms synthetic pills for most healthy individuals.
 
 Proven Supplements:
@@ -83,9 +79,8 @@ Always consult your physician before starting high-dose supplement regimens.`,
     date: 'Aug 29, 2026',
     readTime: '4 min read',
     title: '10 Ultra-Processed Foods You Should Limit',
-    excerpt: 'Ultra-processed foods now make up more than 50% of calories in many Indian households. Here are the key culprits and better swaps.',
+    excerpt: 'Ultra-processed foods now make up more than 50% of calories in many households. Here are the key culprits and better swaps.',
     color: '#D97706',
-    emoji: '🛒',
     content: `Ultra-processed foods (Nova Group 4) undergo multiple industrial processes and contain formulations of industrial ingredients like hydrogenated oils, emulsifiers, and modified starches.
 
 The top culprits:
@@ -102,10 +97,9 @@ Simple swaps: Switch to rolled oats, boiled sprouts, homemade paneer, and season
     category: 'Cooking',
     date: 'Aug 22, 2026',
     readTime: '7 min read',
-    title: 'Healthy Indian Cooking Oils A Complete Guide',
-    excerpt: "Cold-pressed mustard, coconut, sesame which oils are genuinely healthy and which ones are just expensive marketing?",
+    title: 'Healthy Indian Cooking Oils: A Complete Guide',
+    excerpt: 'Cold-pressed mustard, coconut, sesame: which oils are genuinely healthy and which ones are just expensive marketing?',
     color: '#059669',
-    emoji: '🫙',
     content: `Cooking oils differ in their fatty acid composition (MUFA, PUFA, SFA) and smoke point.
 
 Our breakdown:
@@ -296,7 +290,7 @@ export default function BlogPage({ onNavigate }) {
             Stay Updated
           </h2>
           <p style={{ margin: '0 auto 1.75rem', color: '#CBD5E1', fontSize: '0.94rem', maxWidth: 460, lineHeight: 1.6 }}>
-            Get the latest nutrition tips and product safety alerts in your inbox. No marketing fluff — only peer-reviewed insights.
+            Get the latest nutrition tips and product safety alerts in your inbox. No marketing fluff: only peer-reviewed insights.
           </p>
 
           {newsletterSubscribed ? (
@@ -311,7 +305,7 @@ export default function BlogPage({ onNavigate }) {
             >
               <CheckCircle size={20} color="#4ADE80" />
               <span style={{ fontWeight: 600, fontSize: '0.94rem', color: '#FFFFFF' }}>
-                🎉 You're subscribed! Welcome to our wellness community.
+                You're subscribed! Welcome to our wellness community.
               </span>
             </motion.div>
           ) : (
@@ -344,6 +338,16 @@ export default function BlogPage({ onNavigate }) {
                   {newsletterError}
                 </div>
               )}
+              <p style={{ margin: '0.75rem 0 0', fontSize: '0.76rem', color: '#94A3B8', textAlign: 'center', width: '100%' }}>
+                By subscribing, you agree to receive editorial research digests. You can unsubscribe at any time. View our{' '}
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.('privacy')}
+                  style={{ background: 'none', border: 'none', color: '#86EFAC', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                >
+                  Privacy Policy
+                </button>.
+              </p>
             </form>
           )}
         </div>
@@ -379,8 +383,9 @@ export default function BlogPage({ onNavigate }) {
               <button
                 className="btn-primary"
                 onClick={() => { setActiveArticle(null); onNavigate?.('home'); }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
               >
-                🔍 Analyze a Product Now
+                <Search size={15} /> Analyze a Product Now
               </button>
               <button
                 className="btn-secondary"
