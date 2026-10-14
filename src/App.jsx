@@ -29,7 +29,7 @@ function PageLoader() {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '1rem' }}>
       <div className="spinner" style={{ width: 32, height: 32 }} />
       <span style={{ color: '#64748B', fontSize: '0.88rem', fontWeight: 500, letterSpacing: '-0.01em' }}>
-        Loading verified data…
+        Loading verified data...
       </span>
     </div>
   );

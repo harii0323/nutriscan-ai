@@ -15,7 +15,7 @@ const CATEGORIES = [
 ];
 
 const SAMPLE_QUERIES = {
-  foods: ['Maggi 2-Minute Noodles', 'Nutella Hazelnut Spread', 'Oatly Barista Oat Milk', 'Lay’s Classic Potato Chips'],
+  foods: ['Maggi 2-Minute Noodles', 'Nutella Hazelnut Spread', 'Oatly Barista Oat Milk', "Lay's Classic Potato Chips"],
   care: ['CeraVe Hydrating Cleanser', 'Dove Deep Moisture Body Wash', 'Head & Shoulders Shampoo'],
   health: ['Optimum Nutrition Gold Whey', 'Multivitamin Daily Gummies', 'Omega-3 Fish Oil 1000mg'],
 };
@@ -224,6 +224,8 @@ export default function HomePage({ onNavigate }) {
             <Search size={20} color="#64748B" style={{ flexShrink: 0 }} />
             <input
               type="text"
+              id="product-search-input"
+              aria-label="Search products, cosmetics, or supplements by name"
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -288,7 +290,14 @@ export default function HomePage({ onNavigate }) {
 
           {/* Visual Input Buttons */}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              aria-label="Upload product package or label image"
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
+            />
             <button
               className="btn-secondary"
               onClick={() => fileInputRef.current?.click()}
@@ -310,7 +319,7 @@ export default function HomePage({ onNavigate }) {
 
         {/* Feature Pills */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center', marginTop: '1.5rem' }}>
-          {['AI Ingredient Analysis', 'Health Grading A–F', 'Safer Alternatives', 'Real-time Results'].map(f => (
+          {['AI Ingredient Analysis', 'Health Grading A to F', 'Safer Alternatives', 'Real-time Results'].map(f => (
             <span key={f} style={{
               background: '#FFFFFF', border: '1px solid #E2E8F0',
               borderRadius: '99px', padding: '0.35rem 0.95rem',

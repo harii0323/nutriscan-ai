@@ -12,9 +12,21 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('firebase')) return 'vendor-firebase';
-          if (id.includes('framer-motion')) return 'vendor-motion';
-          if (id.includes('lucide-react')) return 'vendor-icons';
+          if (/firestore/i.test(id)) {
+            return 'vendor-firestore';
+          }
+          if (/auth/i.test(id) && (id.includes('firebase') || id.includes('@firebase'))) {
+            return 'vendor-firebase-auth';
+          }
+          if (id.includes('firebase') || id.includes('@firebase')) {
+            return 'vendor-firebase-core';
+          }
+          if (id.includes('framer-motion')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('lucide-react')) {
+            return 'vendor-icons';
+          }
         },
       },
     },
