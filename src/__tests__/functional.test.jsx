@@ -43,6 +43,12 @@ vi.mock('../firebaseConfig.js', () => ({
   googleProvider: {},
 }));
 
+vi.mock('../firestore.js', () => ({
+  db: {},
+  APP_ID: 'nutriscan-ai',
+  default: {},
+}));
+
 vi.mock('firebase/firestore', () => ({
   doc: vi.fn(() => ({ id: 'mock-doc' })),
   getDoc: vi.fn().mockResolvedValue({ exists: () => false }),
@@ -689,7 +695,7 @@ describe('Functional Tests: App Shell & Routing Navigation', () => {
     const loginBtn = screen.getByRole('button', { name: /Login/i });
     fireEvent.click(loginBtn);
 
-    expect(screen.getByText('Welcome back')).toBeDefined();
+    expect(await screen.findByText('Welcome back')).toBeDefined();
 
     const closeBtn = screen.getByLabelText('Close dialog');
     fireEvent.click(closeBtn);

@@ -1,10 +1,10 @@
-// Product Details Page – AI product analysis result
+// Product Details Page: AI product analysis result
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Bookmark, Share2, Check, ShieldAlert, FlaskConical, CheckCircle2 } from 'lucide-react';
 import { GradeBadge, IngredientRow, PageWrapper } from './Shared.jsx';
 import { analyzeProductAI } from '../services/gemini.js';
-import { db, APP_ID } from '../firebaseConfig.js';
+import { db, APP_ID } from '../firestore.js';
 import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 async function analyzeProductWithAI(query, type, imageBase64) {

@@ -11,7 +11,7 @@ import {
   analyzeFoodNutritionAI,
   getAIInsightAI,
 } from '../services/gemini.js';
-import { db, APP_ID } from '../firebaseConfig.js';
+import { db, APP_ID } from '../firestore.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 async function identifyFoodItems(imageBase64) {

@@ -8,7 +8,7 @@ import {
 import { auth } from './firebaseConfig.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
-import AuthModal from './components/Modals.jsx';
+const AuthModal = lazy(() => import('./components/Modals.jsx'));
 import HomePage from './components/HomePage.jsx';
 import CookieConsentBanner from './components/CookieConsentBanner.jsx';
 import { BUSINESS_CONFIG } from './config/businessConfig.js';
@@ -521,8 +521,11 @@ export default function App() {
         })}
       </nav>
 
-      {/* ── Auth Modal ─────────────────────────────────────────────────── */}
-      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onNavigate={navigate} />
+      {authOpen && (
+        <Suspense fallback={null}>
+          <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onNavigate={navigate} />
+        </Suspense>
+      )}
 
       {/* ── Cookie Consent Banner ───────────────────────────────────────── */}
       <CookieConsentBanner onNavigate={navigate} />

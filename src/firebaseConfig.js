@@ -1,9 +1,8 @@
-// Firebase configuration
-// Replace these values with your actual Firebase project configuration
+// Firebase Core Client Configuration
+// Lightweight entry point: only initializes app and auth
+// Firestore is decoupled into src/firestore.js for on-demand lazy loading
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
@@ -16,18 +15,8 @@ const firebaseConfig = {
 
 export const APP_ID = import.meta.env.VITE_APP_ID || 'nutriscan-ai';
 
-const app = initializeApp(firebaseConfig);
-
+export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const functions = getFunctions(app, 'us-central1');
 export const googleProvider = new GoogleAuthProvider();
-
-// Use emulator in development if needed
-// if (import.meta.env.DEV) {
-//   connectFunctionsEmulator(functions, 'localhost', 5001);
-// }
-
-export { app, httpsCallable };
 
 export default app;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { app, auth, db } from '../firebaseConfig.js';
+import { app, auth } from '../firebaseConfig.js';
+import { db } from '../firestore.js';
 import { PAGES } from '../routes.js';
 
 describe('Integration Tests: Firebase Configuration & Modules', () => {

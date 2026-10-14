@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { PageWrapper, EmptyState, GradeBadge, ModalOverlay } from './Shared.jsx';
 import { updateProfile } from 'firebase/auth';
-import { db, auth, APP_ID } from '../firebaseConfig.js';
+import { auth } from '../firebaseConfig.js';
+import { db, APP_ID } from '../firestore.js';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import CookieConsentBanner from './CookieConsentBanner.jsx';
 
