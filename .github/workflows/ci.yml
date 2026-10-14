@@ -18,9 +18,9 @@ permissions:
 
 jobs:
   security-and-build:
-    name: Lint, Audit, Test, Build & Secret Scan
+    name: Lint, Audit, Test, Build, Rule Emulator & Secret Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Repository
@@ -32,15 +32,23 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Setup Java 21 (Temurin) for Firestore Rules Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Install Frontend Dependencies (Clean Lockfile)
         run: npm ci
 
       - name: Install Cloud Functions Dependencies
         run: npm --prefix functions ci
 
-      - name: Dependency Vulnerability Audit (High/Critical)
+      - name: Frontend Dependency Vulnerability Audit (High/Critical Blocking)
         run: npm audit --audit-level=high
-        continue-on-error: true
+
+      - name: Backend Dependency Vulnerability Audit (High/Critical Blocking)
+        run: npm --prefix functions audit --audit-level=high
 
       - name: Code Quality & Linting (Oxlint)
         run: npm run lint
@@ -51,17 +59,26 @@ jobs:
       - name: Backend TypeScript Compilation
         run: npm run build:functions
 
-      - name: Security & Authorization Tests
+      - name: Security & Authorization Regression Tests
         run: npm run test:security
 
       - name: Complete Automated Test Suite
         run: npm run test:fast
 
+      - name: Behavioral Firestore Emulator Rules Tests
+        run: npm run test:rules
+
       - name: Production Frontend Bundle Build (Vite)
         run: npm run build
 
+      - name: Production Bundle Size & Budget Verification
+        run: npm run check:bundle
+
       - name: Production Asset Secret Scanner
         run: npm run scan:secrets
+
+      - name: Bounded Performance Smoke Benchmark
+        run: node scripts/performance-test.mjs --smoke
 
   production-release-gate:
     name: Strict Production Operator Verification Gate

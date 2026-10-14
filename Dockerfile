@@ -50,9 +50,11 @@ RUN touch .env.local && \
 RUN npm run lint
 RUN npm run test:fast
 
-# Compile production bundle and scan assets for secrets
+# Compile production bundle, scan assets for secrets, verify budget and smoke test
 RUN npm run build
 RUN npm run scan:secrets
+RUN npm run check:bundle
+RUN node scripts/performance-test.mjs --smoke
 
 # Stage 2: Production Nginx Runtime
 FROM nginx:1.27-alpine AS runner

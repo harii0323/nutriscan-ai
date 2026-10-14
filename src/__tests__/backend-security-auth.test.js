@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as admin from '../../functions/node_modules/firebase-admin';
 import {
   authenticateUser,
+  authenticateUserStrict,
   optionalAuth,
   rateLimit,
+  limitConcurrency,
   deleteUserAccountData,
   extractJSON,
   app,
@@ -561,3 +563,214 @@ describe('Backend Security: Route Authentication Enforcement & Public Access Sco
     expect(res.body.code).toBe('INVALID_LAST_MESSAGE');
   });
 });
+
+describe('Backend Security: Concurrency Controls & Active Request Throttling', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('enforces maximum concurrent operations per user and rejects burst requests with 429', async () => {
+    const limiter = limitConcurrency(2);
+    const req = {
+      ip: '192.168.1.100',
+      socket: { remoteAddress: '192.168.1.100' },
+      user: { uid: 'concurrent-user-1' },
+      correlationId: 'req-conc-1',
+    };
+
+    let status3 = 0;
+    let json3 = null;
+
+    const listeners = [];
+    const createMockRes = (onStatus, onJson) => ({
+      setHeader: vi.fn(),
+      status(s) {
+        if (onStatus) onStatus(s);
+        return this;
+      },
+      json(d) {
+        if (onJson) onJson(d);
+        return this;
+      },
+      on(event, fn) {
+        listeners.push({ event, fn });
+      },
+    });
+
+    const next1 = vi.fn();
+    limiter(req, createMockRes(), next1);
+    expect(next1).toHaveBeenCalledTimes(1);
+
+    const next2 = vi.fn();
+    limiter(req, createMockRes(), next2);
+    expect(next2).toHaveBeenCalledTimes(1);
+
+    // 3rd concurrent request exceeds limit of 2
+    const next3 = vi.fn();
+    limiter(
+      req,
+      createMockRes(
+        (s) => (status3 = s),
+        (d) => (json3 = d)
+      ),
+      next3
+    );
+    expect(next3).not.toHaveBeenCalled();
+    expect(status3).toBe(429);
+    expect(json3.code).toBe('CONCURRENT_REQUEST_LIMIT');
+
+    // Finish one request
+    listeners.filter((l) => l.event === 'finish')[0]?.fn();
+
+    // Now a new request should be allowed
+    const next4 = vi.fn();
+    limiter(req, createMockRes(() => {}), next4);
+    expect(next4).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Backend Security: Fail-Closed Rate Limiter Policy & Anonymized IP Keys', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('fails closed when distributed store is down for fail_closed policy (sensitive/expensive tiers)', async () => {
+    vi.spyOn(admin.firestore(), 'runTransaction').mockRejectedValue(new Error('Firestore timeout / unreachable'));
+
+    const failClosedLimiter = rateLimit(60000, 5, 'sensitive_tier', 'fail_closed');
+    const req = {
+      ip: '203.0.113.195',
+      socket: { remoteAddress: '203.0.113.195' },
+      correlationId: 'rate-fail-closed',
+    };
+
+    let statusCode = 0;
+    let resJson = null;
+    const res = {
+      setHeader: vi.fn(),
+      status(s) {
+        statusCode = s;
+        return this;
+      },
+      json(d) {
+        resJson = d;
+        return this;
+      },
+    };
+    const next = vi.fn();
+
+    await failClosedLimiter(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(statusCode).toBe(429);
+    expect(resJson.code).toBe('RATE_LIMIT_EXCEEDED');
+    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '60');
+  });
+
+  it('hashes IP address with SHA-256 and never exposes raw IP in rate limit doc path', async () => {
+    let capturedDocPath = '';
+    vi.spyOn(admin.firestore(), 'doc').mockImplementation((docPath) => {
+      capturedDocPath = docPath;
+      return {
+        get: vi.fn(),
+        set: vi.fn(),
+      };
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => null }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const limiter = rateLimit(60000, 10, 'ip_test');
+    const rawIp = '198.51.100.42';
+    const req = {
+      ip: rawIp,
+      socket: { remoteAddress: rawIp },
+      correlationId: 'rate-hash-test',
+    };
+    const res = { setHeader: vi.fn(), status: vi.fn(), json: vi.fn() };
+    const next = vi.fn();
+
+    await limiter(req, res, next);
+
+    expect(capturedDocPath).not.toContain(rawIp);
+    expect(capturedDocPath).toMatch(/system_rate_limits\/ip_test_ip_[a-f0-9]{16}/);
+  });
+});
+
+describe('Backend Security: Strict Authentication for Sensitive Endpoints', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects revoked tokens with TOKEN_REVOKED using verifyIdToken checkRevoked flag', async () => {
+    const req = {
+      headers: { authorization: 'Bearer revoked-token' },
+      correlationId: 'req-revoked',
+    };
+    let status = 0;
+    let body = null;
+    const res = {
+      status(s) {
+        status = s;
+        return this;
+      },
+      json(d) {
+        body = d;
+        return this;
+      },
+    };
+    const next = vi.fn();
+
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockImplementation(async (token, checkRevoked) => {
+      expect(checkRevoked).toBe(true);
+      const err = new Error('Token revoked');
+      err.code = 'auth/id-token-revoked';
+      throw err;
+    });
+
+    await authenticateUserStrict(req, res, next);
+
+    expect(status).toBe(401);
+    expect(body.code).toBe('TOKEN_REVOKED');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects stale authentication sessions (>1 hour old) for sensitive operations', async () => {
+    const req = {
+      headers: { authorization: 'Bearer stale-token' },
+      correlationId: 'req-stale',
+    };
+    let status = 0;
+    let body = null;
+    const res = {
+      status(s) {
+        status = s;
+        return this;
+      },
+      json(d) {
+        body = d;
+        return this;
+      },
+    };
+    const next = vi.fn();
+
+    // Authenticated 2 hours ago
+    const twoHoursAgoSeconds = Math.floor((Date.now() - 7200 * 1000) / 1000);
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockResolvedValue({
+      uid: 'user-stale',
+      auth_time: twoHoursAgoSeconds,
+    });
+
+    await authenticateUserStrict(req, res, next);
+
+    expect(status).toBe(403);
+    expect(body.code).toBe('RECENT_AUTH_REQUIRED');
+    expect(next).not.toHaveBeenCalled();
+  });
+});
+
