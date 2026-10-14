@@ -166,7 +166,13 @@ export default function UserProfilePage({ user, onSignOut, onAuthRequest, onNavi
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         if (res.status === 401) {
-          throw new Error('Your session has expired. Please sign out and sign in again before deleting your account.');
+          throw new Error('Your session has expired or was revoked. Please sign out and sign in again before deleting your account.');
+        }
+        if (res.status === 403 && errData.code === 'RECENT_AUTH_REQUIRED') {
+          throw new Error('For security, account deletion requires a recent sign-in. Please sign out, sign in again, and retry.');
+        }
+        if (res.status === 429 || errData.code === 'RATE_LIMIT_EXCEEDED') {
+          throw new Error('Too many deletion attempts. Please wait an hour before trying again.');
         }
         throw new Error(errData.error || `Server account erasure failed with status ${res.status}.`);
       }

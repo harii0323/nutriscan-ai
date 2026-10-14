@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/generate-version.mjs && vite build",
     "lint": "oxlint src scripts",
     "test": "vitest run",
     "test:fast": "vitest run src/__tests__/unit.test.js src/__tests__/integration.test.js src/__tests__/functional.test.jsx src/__tests__/security-build.test.js src/__tests__/backend-security-auth.test.js src/__tests__/firestore-rules.test.js",

@@ -1160,7 +1160,7 @@ export async function deleteUserAccountData(uid: string): Promise<void> {
 // POST /deleteAccount - Authorized complete account deletion endpoint with strict authentication & fail-closed rate limit
 app.post(
   '/deleteAccount',
-  authenticateUser,
+  authenticateUserStrict,
   rateLimit(3600000, 3, 'sensitive_deletion', 'fail_closed'),
   async (req: Request, res: Response) => {
     const uid = (req as any).user?.uid;
@@ -1219,17 +1219,94 @@ export const getProductData = onCall(async (request) => {
   }
 });
 
-// Callable Function for Client SDK: Account Deletion
+// Callable Function for Client SDK: Account Deletion (Strictly Authenticated, Revocation-Checked & IDOR-Protected)
 export const deleteAccount = onCall(async (request) => {
   if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated to delete account');
+    throw new HttpsError('unauthenticated', 'User must be authenticated to request account deletion.');
   }
-  const uid = request.auth.uid;
+
+  const callerUid = request.auth.uid;
+  const targetUid = request.data?.uid || request.data?.targetUid;
+
+  // Enforce IDOR protection: Caller can only request deletion of their own account
+  if (targetUid && targetUid !== callerUid) {
+    throw new HttpsError('permission-denied', 'Unauthorized: You can only delete your own account.');
+  }
+
+  // Verify token revocation & account state via Admin SDK
+  let userRecord: admin.auth.UserRecord;
   try {
-    await deleteUserAccountData(uid);
-    return { success: true };
+    userRecord = await admin.auth().getUser(callerUid);
   } catch (err: any) {
-    throw new HttpsError('internal', err.message || 'Account deletion failed');
+    if (err.code === 'auth/user-not-found') {
+      throw new HttpsError('not-found', 'User account does not exist.');
+    }
+    throw new HttpsError('internal', 'Failed to verify account authorization.');
+  }
+
+  if (userRecord.disabled) {
+    throw new HttpsError('permission-denied', 'User account is disabled.');
+  }
+
+  // Check token revocation
+  const authTimeSeconds = (request.auth.token as any)?.auth_time || 0;
+  const authTimeMs = authTimeSeconds * 1000;
+  if (userRecord.tokensValidAfterTime) {
+    const validAfterMs = new Date(userRecord.tokensValidAfterTime).getTime();
+    if (authTimeMs < validAfterMs) {
+      throw new HttpsError('unauthenticated', 'Authentication token has been revoked. Please re-authenticate.');
+    }
+  }
+
+  // Require recent authentication (within 3600 seconds = 1 hour)
+  const maxAgeMs = 3600 * 1000;
+  if (authTimeMs && Date.now() - authTimeMs > maxAgeMs) {
+    throw new HttpsError(
+      'permission-denied',
+      'Recent authentication required for sensitive operation. Please re-authenticate.'
+    );
+  }
+
+  // Rate limiting check for callable function
+  const safeKey = `sensitive_deletion_user_${callerUid.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+  const limitRef = db.doc(`artifacts/${APP_ID}/system_rate_limits/${safeKey}`);
+  const now = Date.now();
+  const windowMs = 3600000; // 1 hour
+  const maxRequests = 3;
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(limitRef);
+      const data = snap.data();
+      if (!snap.exists || !data || (data.resetAt && data.resetAt <= now)) {
+        transaction.set(limitRef, {
+          count: 1,
+          resetAt: now + windowMs,
+          tier: 'sensitive_deletion',
+          identifier: `user_${callerUid}`,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+      if (data.count >= maxRequests) {
+        throw new HttpsError('resource-exhausted', 'Account deletion rate limit exceeded. Please try again later.');
+      }
+      transaction.update(limitRef, {
+        count: data.count + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+  } catch (err: any) {
+    if (err instanceof HttpsError) throw err;
+    // If distributed rate limiter fails or times out, fail-closed for sensitive deletion
+    throw new HttpsError('resource-exhausted', 'Abuse protection check temporarily unavailable. Please try again later.');
+  }
+
+  try {
+    await deleteUserAccountData(callerUid);
+    return { success: true, message: 'Account and associated records deleted successfully.' };
+  } catch {
+    throw new HttpsError('internal', 'Account deletion failed. Please try again or contact customer support.');
   }
 });
 

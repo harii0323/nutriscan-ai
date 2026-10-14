@@ -9,7 +9,59 @@ import {
   deleteUserAccountData,
   extractJSON,
   app,
+  deleteAccount,
 } from '../../functions/lib/index.js';
+
+// Top-level helper to dispatch requests through Express app
+function dispatchApp(options) {
+  return new Promise((resolve) => {
+    const headers = { ...(options.headers || {}) };
+    const req = {
+      method: options.method || 'GET',
+      url: options.url || '/',
+      headers,
+      body: options.body || {},
+      query: options.query || {},
+      ip: options.ip || '127.0.0.1',
+      socket: { remoteAddress: '127.0.0.1' },
+    };
+
+    const resHeaders = {};
+    let statusCode = 200;
+    let bodyData = null;
+
+    const res = {
+      setHeader(name, val) {
+        resHeaders[name.toLowerCase()] = val;
+      },
+      getHeader(name) {
+        return resHeaders[name.toLowerCase()];
+      },
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      json(data) {
+        bodyData = data;
+        resolve({ status: statusCode, headers: resHeaders, body: bodyData });
+      },
+      send(data) {
+        bodyData = data;
+        resolve({ status: statusCode, headers: resHeaders, body: bodyData });
+      },
+      end() {
+        resolve({ status: statusCode, headers: resHeaders, body: bodyData });
+      },
+    };
+
+    app.handle(req, res, (err) => {
+      if (err) {
+        resolve({ status: 500, headers: resHeaders, error: err.message });
+      }
+    });
+  });
+}
+
 
 describe('Backend Security: Authentication Middleware', () => {
   beforeEach(() => {
@@ -397,55 +449,6 @@ describe('Backend Security: Route Authentication Enforcement & Public Access Sco
     vi.restoreAllMocks();
   });
 
-  // Helper to dispatch request through express app
-  function dispatchApp(options) {
-    return new Promise((resolve) => {
-      const headers = { ...(options.headers || {}) };
-      const req = {
-        method: options.method || 'GET',
-        url: options.url || '/',
-        headers,
-        body: options.body || {},
-        query: options.query || {},
-        ip: options.ip || '127.0.0.1',
-        socket: { remoteAddress: '127.0.0.1' },
-      };
-
-      const resHeaders = {};
-      let statusCode = 200;
-      let bodyData = null;
-
-      const res = {
-        setHeader(name, val) {
-          resHeaders[name.toLowerCase()] = val;
-        },
-        getHeader(name) {
-          return resHeaders[name.toLowerCase()];
-        },
-        status(code) {
-          statusCode = code;
-          return this;
-        },
-        json(data) {
-          bodyData = data;
-          resolve({ status: statusCode, headers: resHeaders, body: bodyData });
-        },
-        send(data) {
-          bodyData = data;
-          resolve({ status: statusCode, headers: resHeaders, body: bodyData });
-        },
-        end() {
-          resolve({ status: statusCode, headers: resHeaders, body: bodyData });
-        },
-      };
-
-      app.handle(req, res, (err) => {
-        if (err) {
-          resolve({ status: 500, headers: resHeaders, error: err.message });
-        }
-      });
-    });
-  }
 
   it('enforces authentication on /analyzeProduct: rejects unauthenticated request with 401', async () => {
     const res = await dispatchApp({
@@ -773,4 +776,495 @@ describe('Backend Security: Strict Authentication for Sensitive Endpoints', () =
     expect(next).not.toHaveBeenCalled();
   });
 });
+
+describe('Backend Security: Account Deletion HTTP Endpoint (/deleteAccount)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects unauthenticated request with 401 UNAUTHORIZED when Authorization header is missing', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('UNAUTHORIZED');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 401 UNAUTHORIZED when Authorization header does not use Bearer scheme', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Basic dXNlcjpwYXNz' },
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('UNAUTHORIZED');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 401 MALFORMED_TOKEN when Bearer token is empty or whitespace', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer   ' },
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('MALFORMED_TOKEN');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 401 INVALID_TOKEN when Firebase reports invalid token signature', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockRejectedValue(new Error('Invalid token'));
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer invalid-token' },
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('INVALID_TOKEN');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 401 TOKEN_EXPIRED when Firebase reports expired session', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockRejectedValue({
+      code: 'auth/id-token-expired',
+      message: 'Token has expired',
+    });
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer expired-token' },
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('TOKEN_EXPIRED');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 401 TOKEN_REVOKED when Firebase reports revoked token', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockRejectedValue({
+      code: 'auth/id-token-revoked',
+      message: 'Token was revoked',
+    });
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer revoked-token' },
+    });
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe('TOKEN_REVOKED');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request with 403 RECENT_AUTH_REQUIRED when authentication was older than 1 hour', async () => {
+    const deleteUserSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    const staleAuthTimeSeconds = Math.floor((Date.now() - 7200 * 1000) / 1000); // 2h ago
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockResolvedValue({
+      uid: 'stale-user-123',
+      auth_time: staleAuthTimeSeconds,
+    });
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer stale-token' },
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('RECENT_AUTH_REQUIRED');
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+  });
+
+  it('enforces rate limiting on /deleteAccount and rejects excessive requests with 429', async () => {
+    const recentAuthTime = Math.floor(Date.now() / 1000) - 60;
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockResolvedValue({
+      uid: 'rate-limited-del-user',
+      auth_time: recentAuthTime,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({ count: 3, resetAt: Date.now() + 3600000 }),
+        }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer valid-token' },
+    });
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('RATE_LIMIT_EXCEEDED');
+  });
+
+  it('handles Firestore failure during deletion and returns 500 DELETION_FAILED safely without exposing stack traces', async () => {
+    const recentAuthTime = Math.floor(Date.now() / 1000) - 60;
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockResolvedValue({
+      uid: 'error-user-123',
+      auth_time: recentAuthTime,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => null }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const userDocMock = {
+      set: vi.fn().mockRejectedValue(new Error('Firestore unavailable / connection closed')),
+    };
+    vi.spyOn(admin.firestore(), 'doc').mockReturnValue(userDocMock);
+
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer valid-token' },
+    });
+
+    expect(res.status).toBe(500);
+    expect(res.body.code).toBe('DELETION_FAILED');
+    expect(res.body.error).toContain('Account erasure failed');
+    expect(res.body.stack).toBeUndefined();
+  });
+
+  it('successfully completes account deletion for a valid recently authenticated user', async () => {
+    const recentAuthTime = Math.floor(Date.now() / 1000) - 30;
+    vi.spyOn(admin.auth(), 'verifyIdToken').mockResolvedValue({
+      uid: 'success-user-999',
+      auth_time: recentAuthTime,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => null }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const userDocMock = {
+      set: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    };
+    const collectionMock = {
+      limit: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ empty: true, docs: [], size: 0 }),
+      }),
+      doc: vi.fn().mockReturnValue({ set: vi.fn().mockResolvedValue({}) }),
+    };
+
+    vi.spyOn(admin.firestore(), 'doc').mockReturnValue(userDocMock);
+    vi.spyOn(admin.firestore(), 'collection').mockReturnValue(collectionMock);
+    const deleteAuthSpy = vi.spyOn(admin.auth(), 'deleteUser').mockResolvedValue({});
+
+    const res = await dispatchApp({
+      method: 'POST',
+      url: '/deleteAccount',
+      headers: { authorization: 'Bearer fresh-valid-token' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(deleteAuthSpy).toHaveBeenCalledWith('success-user-999');
+    expect(userDocMock.delete).toHaveBeenCalled();
+  });
+});
+
+describe('Backend Security: Account Deletion Firebase Callable Function (deleteAccount)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects unauthenticated invocation: throws unauthenticated when request.auth is missing', async () => {
+    const deleteAuthSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    await expect(deleteAccount.run({})).rejects.toMatchObject({
+      code: 'unauthenticated',
+      message: expect.stringContaining('authenticated'),
+    });
+    expect(deleteAuthSpy).not.toHaveBeenCalled();
+  });
+
+  it('blocks IDOR attempt: caller A attempting to delete user B throws permission-denied', async () => {
+    const deleteAuthSpy = vi.spyOn(admin.auth(), 'deleteUser');
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'user-attacker',
+          token: { auth_time: Math.floor(Date.now() / 1000) },
+        },
+        data: { uid: 'user-victim' },
+      })
+    ).rejects.toMatchObject({
+      code: 'permission-denied',
+      message: expect.stringContaining('only delete your own account'),
+    });
+    expect(deleteAuthSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects request when caller does not exist in Firebase Auth (throws not-found)', async () => {
+    vi.spyOn(admin.auth(), 'getUser').mockRejectedValue({ code: 'auth/user-not-found' });
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'ghost-user',
+          token: { auth_time: Math.floor(Date.now() / 1000) },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'not-found',
+    });
+  });
+
+  it('rejects request when caller account is disabled (throws permission-denied)', async () => {
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'disabled-user',
+      disabled: true,
+    });
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'disabled-user',
+          token: { auth_time: Math.floor(Date.now() / 1000) },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+  });
+
+  it('rejects revoked token when tokensValidAfterTime is newer than auth_time (throws unauthenticated)', async () => {
+    const authTime = Math.floor(Date.now() / 1000) - 600; // 10m ago
+    const revokedAtIso = new Date(Date.now() - 60 * 1000).toISOString(); // revoked 1m ago
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'revoked-caller',
+      disabled: false,
+      tokensValidAfterTime: revokedAtIso,
+    });
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'revoked-caller',
+          token: { auth_time: authTime },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'unauthenticated',
+      message: expect.stringContaining('revoked'),
+    });
+  });
+
+  it('rejects stale session (>1 hour old) for sensitive callable deletion (throws permission-denied)', async () => {
+    const staleAuthTime = Math.floor(Date.now() / 1000) - 7200; // 2h ago
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'stale-caller',
+      disabled: false,
+    });
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'stale-caller',
+          token: { auth_time: staleAuthTime },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'permission-denied',
+      message: expect.stringContaining('Recent authentication required'),
+    });
+  });
+
+  it('enforces rate limit and throws resource-exhausted when rate threshold is exceeded', async () => {
+    const freshAuthTime = Math.floor(Date.now() / 1000) - 60;
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'rate-limited-caller',
+      disabled: false,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({
+          exists: true,
+          data: () => ({ count: 3, resetAt: Date.now() + 3600000 }),
+        }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'rate-limited-caller',
+          token: { auth_time: freshAuthTime },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'resource-exhausted',
+      message: expect.stringContaining('rate limit exceeded'),
+    });
+  });
+
+  it('fails closed and throws resource-exhausted if rate limiter transaction encounters error', async () => {
+    const freshAuthTime = Math.floor(Date.now() / 1000) - 60;
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'fail-closed-caller',
+      disabled: false,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockRejectedValue(new Error('Firestore connection failure'));
+
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'fail-closed-caller',
+          token: { auth_time: freshAuthTime },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'resource-exhausted',
+      message: expect.stringContaining('Abuse protection check temporarily unavailable'),
+    });
+  });
+
+  it('handles partial deletion failure gracefully, records failure status, and allows safe retry', async () => {
+    const freshAuthTime = Math.floor(Date.now() / 1000) - 60;
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'retry-caller-123',
+      disabled: false,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => null }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const userDocMock = {
+      set: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    };
+    const collectionMock = {
+      limit: vi.fn().mockReturnValue({
+        get: vi.fn().mockRejectedValue(new Error('Transient subcollection query timeout')),
+      }),
+      doc: vi.fn().mockReturnValue({ set: vi.fn().mockResolvedValue({}) }),
+    };
+
+    vi.spyOn(admin.firestore(), 'doc').mockReturnValue(userDocMock);
+    vi.spyOn(admin.firestore(), 'collection').mockReturnValue(collectionMock);
+
+    await expect(
+      deleteAccount.run({
+        auth: {
+          uid: 'retry-caller-123',
+          token: { auth_time: freshAuthTime },
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'internal',
+    });
+
+    expect(userDocMock.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deletionStatus: 'failed',
+      }),
+      { merge: true }
+    );
+  });
+
+  it('successfully completes callable account deletion for dedicated test user with recent session', async () => {
+    const freshAuthTime = Math.floor(Date.now() / 1000) - 15;
+    vi.spyOn(admin.auth(), 'getUser').mockResolvedValue({
+      uid: 'valid-callable-test-user',
+      disabled: false,
+    });
+
+    vi.spyOn(admin.firestore(), 'runTransaction').mockImplementation(async (cb) => {
+      return cb({
+        get: vi.fn().mockResolvedValue({ exists: false, data: () => null }),
+        set: vi.fn(),
+        update: vi.fn(),
+      });
+    });
+
+    const userDocMock = {
+      set: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    };
+    const collectionMock = {
+      limit: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ empty: true, docs: [], size: 0 }),
+      }),
+      doc: vi.fn().mockReturnValue({ set: vi.fn().mockResolvedValue({}) }),
+    };
+
+    vi.spyOn(admin.firestore(), 'doc').mockReturnValue(userDocMock);
+    vi.spyOn(admin.firestore(), 'collection').mockReturnValue(collectionMock);
+    const deleteAuthSpy = vi.spyOn(admin.auth(), 'deleteUser').mockResolvedValue({});
+
+    const result = await deleteAccount.run({
+      auth: {
+        uid: 'valid-callable-test-user',
+        token: { auth_time: freshAuthTime },
+      },
+    });
+
+    expect(result).toBeDefined();
+    expect(result.success).toBe(true);
+    expect(deleteAuthSpy).toHaveBeenCalledWith('valid-callable-test-user');
+    expect(userDocMock.delete).toHaveBeenCalled();
+  });
+});
+
+describe('Backend Security: Audit Logs & Privacy Hygiene', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('hashes user UID with SHA-256 and never logs raw UID in audit trail', async () => {
+    let capturedAuditDoc = null;
+    const userDocMock = {
+      set: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+    };
+    const collectionMock = {
+      limit: vi.fn().mockReturnValue({
+        get: vi.fn().mockResolvedValue({ empty: true, docs: [], size: 0 }),
+      }),
+      doc: vi.fn().mockReturnValue({
+        set: vi.fn().mockImplementation((data) => {
+          capturedAuditDoc = data;
+          return Promise.resolve();
+        }),
+      }),
+    };
+
+    vi.spyOn(admin.firestore(), 'doc').mockReturnValue(userDocMock);
+    vi.spyOn(admin.firestore(), 'collection').mockReturnValue(collectionMock);
+    vi.spyOn(admin.auth(), 'deleteUser').mockResolvedValue({});
+
+    const rawUid = 'confidential-user-privacy-test-999';
+    await deleteUserAccountData(rawUid);
+
+    expect(capturedAuditDoc).toBeDefined();
+    expect(capturedAuditDoc.action).toBe('USER_ACCOUNT_DELETED');
+    expect(capturedAuditDoc.userIdHash).not.toBe(rawUid);
+    expect(capturedAuditDoc.userIdHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(capturedAuditDoc).not.toHaveProperty('token');
+    expect(capturedAuditDoc).not.toHaveProperty('authorization');
+  });
+});
+
 
